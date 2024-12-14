@@ -4,4 +4,8 @@ CHANGELOG
 Create main.ini
 Create main.py	
 	read ini,connect to redis
-	
+
+# Rev 0.1.1 
+Create fLog.py, fConfig.py
+	log to log\main.log,success
+	log to screen,success

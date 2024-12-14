@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-import configparser
 import json
 import time
 import traceback
-import redis
+# import redis
+from fLog import clsLogger
+from fConfig import clsConfig
 # import fRedis
 
 class main:
@@ -17,36 +18,36 @@ class main:
         
 
     def run(self):
-        # log : main线程启动 
-                
+        ini_config=clsConfig('main.ini')        
+        __inst_logger__ = clsLogger(ini_config)  
+        #__inst_redis__ = clsRedis(ini_config)
+        __inst_logger__.info("main 线程启动")
         # 读取配置文件，例如redis地址
+        
         # log 配置文件读取成功/否则log 配置文件错误并退出主程序  
         try:
-            config = configparser.ConfigParser()
-            config.read('main.ini')
-            __redis_addr__ = config['Network']['Redis_IP']
-            __redis_port__ = config['Network']['Redis_Port']
-            __redis_db__ = config['Network']['Redis_db']
-            
+            ini_config2=clsConfig('main.ini')
         except:
-        #    log ("配置读取失败--Redis 地址未能成功获取")
-        #    log traceback.format_exc()
         #    input("read redis info from ini failed, press any keys....")
+            __inst_logger__.error("配置读取失败--Redis地址未能成功获取"+traceback.format_exc())
             input("从ini文件中读取Redis地址失败,请按任意键....")
             exit
         # 组合redis地址 端口与默认数据库至一个字符串，便于传递给各线程
-        redis_info= __redis_addr__+'/'+__redis_port__+'/'+__redis_db__
+        # redis_info= __redis_addr__+'/'+__redis_port__+'/'+__redis_db__
+        # __device_name__= config['Name']['Device_Name']
+        # 不再组合Redis地址信息机device name信息，直接将ini_config实例传递给各线程
+
+        __inst_logger__.info("配置与日志初始化成功")
         
-        __device_name__= config['Name']['Device_Name']
-        
+
         # 尝试连接Redis
         try:
-            self.r = redis.Redis(host=__redis_addr__, port=__redis_port__, db=__redis_db__)
-            self.r.set(f"sys:device_name",__device_name__)
-            
+            #__inst_redis__.connect()
+            #self.r = redis.Redis(host=__redis_addr__, port=__redis_port__, db=__redis_db__)
+            #self.r.set(f"sys:device_name",__device_name__)
+            time.sleep(10)
         except:
-            log ("Redis链接失败")
-            log traceback.format_exc()
+            __inst_logger__.error ("Redis链接失败"+traceback.format_exc())
             exit
         '''                
         # 按prc_list启动所有线程
@@ -68,8 +69,13 @@ class main:
                __loop_status__ = false;
            # Do Something;
            sleep(100)
-        '''
- 
+        config = configparser.ConfigParser()
+            config.read('main.ini')
+            __redis_addr__ = config['Network']['Redis_IP']
+            __redis_port__ = config['Network']['Redis_Port']
+            __redis_db__ = config['Network']['Redis_db']
+'''
+     
 if __name__ == '__main__':
     app = main()
     app.run()
