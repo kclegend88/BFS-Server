@@ -5,7 +5,7 @@ import traceback
 # import redis
 from fLog import clsLogger
 from fConfig import clsConfig
-# import fRedis
+from fRedis import clsRedis
 
 class main:
     def __init__(self):
@@ -20,34 +20,28 @@ class main:
     def run(self):
         ini_config=clsConfig('main.ini')        
         __inst_logger__ = clsLogger(ini_config)  
-        #__inst_redis__ = clsRedis(ini_config)
+        __inst_redis__ = clsRedis(ini_config)
         __inst_logger__.info("main 线程启动")
-        # 读取配置文件，例如redis地址
-        
+        # 读取配置文件
         # log 配置文件读取成功/否则log 配置文件错误并退出主程序  
         try:
-            ini_config2=clsConfig('main.ini')
+            __device_name__= ini_config.Name.Device_Name
         except:
         #    input("read redis info from ini failed, press any keys....")
-            __inst_logger__.error("配置读取失败--Redis地址未能成功获取"+traceback.format_exc())
-            input("从ini文件中读取Redis地址失败,请按任意键....")
+            __inst_logger__.error("配置读取失败"+traceback.format_exc())
+            input("从ini文件中读取配置信息失败,请按任意键....")
             exit
-        # 组合redis地址 端口与默认数据库至一个字符串，便于传递给各线程
-        # redis_info= __redis_addr__+'/'+__redis_port__+'/'+__redis_db__
-        # __device_name__= config['Name']['Device_Name']
-        # 不再组合Redis地址信息机device name信息，直接将ini_config实例传递给各线程
 
         __inst_logger__.info("配置与日志初始化成功")
         
 
         # 尝试连接Redis
         try:
-            #__inst_redis__.connect()
-            #self.r = redis.Redis(host=__redis_addr__, port=__redis_port__, db=__redis_db__)
-            #self.r.set(f"sys:device_name",__device_name__)
-            time.sleep(10)
+            __inst_redis__.connect(ini_config)
+            __inst_redis__.setkey(f"sys:ready", "true")
+            __inst_logger__.info("Redis 连接成功")
         except:
-            __inst_logger__.error ("Redis链接失败"+traceback.format_exc())
+            __inst_logger__.error ("Redis连接失败"+traceback.format_exc())
             exit
         '''                
         # 按prc_list启动所有线程
@@ -74,6 +68,10 @@ class main:
             __redis_addr__ = config['Network']['Redis_IP']
             __redis_port__ = config['Network']['Redis_Port']
             __redis_db__ = config['Network']['Redis_db']
+                    # 组合redis地址 端口与默认数据库至一个字符串，便于传递给各线程
+        # redis_info= __redis_addr__+'/'+__redis_port__+'/'+__redis_db__
+        # __device_name__= config['Name']['Device_Name']
+        # 不再组合Redis地址信息机device name信息，直接将ini_config实例传递给各线程
 '''
      
 if __name__ == '__main__':

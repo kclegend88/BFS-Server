@@ -29,6 +29,7 @@ class clsLogger:
             deviceName = iniConfig.Name.Device_Name  # 设备名称
             
             # 创建文件handler
+            # ToDo:调试发现，如目录或文件不存在，会报错并退出，无法自行创建;后续需加入自动创建代码
             file_handler = RotatingFileHandler(log_Filename, maxBytes=log_Size, backupCount=log_Count,
                                           encoding='utf-8')  # 文件路径/文件名，最大大小，备份数量
             # 创建屏幕handler
