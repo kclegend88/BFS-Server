@@ -2,10 +2,14 @@
 import json
 import time
 import traceback
+import threading
 # import redis
 from fLog import clsLogger
 from fConfig import clsConfig
 from fRedis import clsRedis
+
+from prc_HIKCamera import start_process as start_HIKCamera
+from prc_PLC import start_process as start_PLC
 
 class main:
     def __init__(self):
@@ -14,35 +18,52 @@ class main:
         
         # 定义线程总表，所有在该表格中的线程由main启动并监控
         self.lst_thread_name = ["HIKCamera", "PLC"]
-        # self.user_list = []
         
 
     def run(self):
+        # 创建配置ini、log、redis实例
         ini_config=clsConfig('main.ini')        
         __inst_logger__ = clsLogger(ini_config)  
         __inst_redis__ = clsRedis(ini_config)
+        
         __inst_logger__.info("main 线程启动")
+
         # 读取配置文件
-        # log 配置文件读取成功/否则log 配置文件错误并退出主程序  
         try:
             __device_name__= ini_config.Name.Device_Name
         except:
-        #    input("read redis info from ini failed, press any keys....")
             __inst_logger__.error("配置读取失败"+traceback.format_exc())
             input("从ini文件中读取配置信息失败,请按任意键....")
             exit
-
         __inst_logger__.info("配置与日志初始化成功")
-        
 
         # 尝试连接Redis
         try:
             __inst_redis__.connect(ini_config)
             __inst_redis__.setkey(f"sys:ready", "true")
+
             __inst_logger__.info("Redis 连接成功")
         except:
             __inst_logger__.error ("Redis连接失败"+traceback.format_exc())
             exit
+        
+        # 尝试启动线程
+        str_thread_name=''
+        try:
+            # 遍历线程总表 逐个启动现场
+            for i,str_prc_name in enumerate(self.lst_thread_name):
+                # 每个线程的start_process 需在import中 定义为start_ + 线程名称
+                str_thread_name = "start_%s" %(str_prc_name,)
+                __inst_logger__.info("主程序尝试启动线程: %s" %(str_thread_name,))
+                # 通过globlas().get 取得指定名称的入口句柄 返回给Thread作为线程启动入口
+                thread = threading.Thread(target=globals().get(str_thread_name), args=(ini_config,),name=str_prc_name)
+                thread.start()
+
+            __inst_logger__.info("主程序已尝试启动全部线程，共计 %d 个" % (len(self.lst_thread_name),))
+        except:
+            __inst_logger__.error ("线程启动失败"+traceback.format_exc())
+            exit
+
         '''                
         # 按prc_list启动所有线程
         # 每启动一个现场，log一次，

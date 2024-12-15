@@ -14,3 +14,9 @@ Create fLog.py, fConfig.py
 Create fRedis.py
 	using default setting, connect to redis,success
 	set redis key, success
+	
+# Rev 0.1.3 
+Create prc_template V 0.1.0 
+	copy prc_HIKCamera
+	copy prc_PLC
+	using lst_thread_name start all thread, success 
