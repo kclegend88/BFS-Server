@@ -35,10 +35,79 @@ class clsRedis:
         else:
             raise Exception("无法连接到Redis默认主机")
       
-    def setkey(self, key,value):
+    def setkey(self, key, value):
         # 设置key-value 键对值
         if self.__isconnected__:
-            self.decoded_connection.set(f"sys:ready", "true")
+            self.decoded_connection.set(f"{key}", f"{value}")
         else:
             raise Exception("Redis尚未建立连接")
-
+    
+    def setkeypx(self, key, value, px):
+        # 设置key-value 键对值，过期时间px ms
+        if self.__isconnected__:
+            self.decoded_connection.psetex(f"{key}", int(px), f"{value}")
+        else:
+            raise Exception("Redis尚未建立连接")
+    
+    def getkey(self, key):
+        # 查询key-value 键对值
+        if self.__isconnected__:
+            value = self.decoded_connection.get(f"{key}")
+            if value is None:
+                # ToDo 后续为redis建立私有logger，查询到空键对值时logger.debug
+                return None
+            else:
+                return value
+        else:
+            raise Exception("Redis尚未建立连接")
+            
+    def incrkey(self, key):
+        # 增加键对值，并返回结果
+        if self.__isconnected__:
+            value = self.decoded_connection.incr(f"{key}")
+            return int(value)
+        else:
+            raise Exception("Redis尚未建立连接")
+            
+    def lpush(self, name,value ):
+        # 向列表左侧增加值
+        # TODO 将该字函数做成自动控制lst长度，并返回平均值(或最大值)
+        if self.__isconnected__:
+            self.decoded_connection.lpush(f"{name}",f"{value}")
+            return
+        else:
+            raise Exception("Redis尚未建立连接")
+    
+    def llen(self, name):
+        # 取得列表长度
+        if self.__isconnected__:
+            value = self.decoded_connection.llen(f"{name}")
+            return int(value)
+        else:
+            raise Exception("Redis尚未建立连接")
+            
+    def rpop(self, name):
+        # 将列表最右侧元素压出
+        if self.__isconnected__:
+            self.decoded_connection.rpop(f"{name}")
+            return
+        else:
+            raise Exception("Redis尚未建立连接")
+                        
+    def sadd(self, name, value ):
+        # 向set增加值
+        # TODO 返回是否有元素重复
+        if self.__isconnected__:
+            self.decoded_connection.sadd(name,value)
+            return
+        else:
+            raise Exception("Redis尚未建立连接")
+    
+    def flushall(self):
+        # 向set增加值
+        # TODO 返回是否有元素重复
+        if self.__isconnected__:
+            self.decoded_connection.flushall()
+            return
+        else:
+            raise Exception("Redis尚未建立连接")

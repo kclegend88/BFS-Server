@@ -7,7 +7,7 @@ from fConfigEx import clsConfigEx
 from fRedis import clsRedis
 
 def start_process(config_file):
-    __prc_name__="HIKCamera"
+    __prc_name__="xxxx"
     
     ini_config = clsConfig(config_file)   # 来自主线程的配置文件
     inst_logger = clsLogger(ini_config)  
