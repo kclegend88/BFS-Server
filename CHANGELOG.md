@@ -20,3 +20,14 @@ Create prc_template V 0.1.0
 	copy prc_HIKCamera
 	copy prc_PLC
 	using lst_thread_name start all thread, success 
+
+# Rev 0.2.0 
+Create prc_template V 0.2.0 
+	copy prc_HIKCamera
+	copy prc_PLC
+	create prc_HIKCamera.ini
+	create prc_PLC.ini
+	thread run_lock、get id from redis, lst_cycle_time, success
+	
+# Rev 0.2.1
+Write fPLC process, main thread of PLC logi finished,need to upgrade;

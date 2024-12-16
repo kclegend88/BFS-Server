@@ -22,8 +22,8 @@ class main:
 
     def run(self):
         # 创建配置ini、log、redis实例
-        ini_config=clsConfig('main.ini')        
-        inst_logger = clsLogger(ini_config)  
+        ini_config = clsConfig('main.ini')
+        inst_logger = clsLogger(ini_config)
         inst_redis = clsRedis(ini_config)
         
         inst_logger.info("main 线程启动")
@@ -34,18 +34,18 @@ class main:
         except:
             inst_logger.error("配置读取失败"+traceback.format_exc())
             input("从ini文件中读取配置信息失败,请按任意键....")
-            exit
+            exit()
         inst_logger.info("配置与日志初始化成功")
 
         # 尝试连接Redis
         try:
             inst_redis.connect(ini_config)
             
-            main_prc_running=inst_redis.getkey(f"sys:ready")
+            main_prc_running = inst_redis.getkey(f"sys:ready")
             if main_prc_running == "true":
                 # 其他main线程正在运行中，强制退出
                 inst_logger.error("已有程序运行中，本程序将退出！！！")
-                exit
+                exit()
             
             inst_redis.setkey(f"sys:ready", "true")
 
@@ -56,7 +56,7 @@ class main:
             
         except:
             inst_logger.error ("Redis连接失败"+traceback.format_exc())
-            exit
+            exit()
         
         # 尝试启动线程
         # str_thread_name=''
@@ -74,7 +74,7 @@ class main:
             inst_logger.info("主程序已尝试启动全部线程，共计 %d 个" % (len(self.lst_thread_name),))
         except:
             inst_logger.error ("线程启动失败"+traceback.format_exc())
-            exit
+            exit()
         
         # 退出时应清理主线程运行标志
         # inst_redis.setkey(f"sys:ready", "false")
