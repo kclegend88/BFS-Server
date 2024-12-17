@@ -78,6 +78,30 @@ class clsRedis:
         else:
             raise Exception("Redis尚未建立连接")
     
+    def lpush_ct(self, name , value ):
+        # cycletime专用 lpush：向列表左侧增加值，自动判断长度，如果大于10向右rpop，自动返回ct平均值和最大值
+        if self.__isconnected__:
+            self.decoded_connection.lpush(f"{name}",f"{value}")
+            int_len_lst =  self.decoded_connection.llen(f"{name}")
+            if int_len_lst > 10:
+                self.decoded_connection.rpop(f"{name}")
+            lst_temp = self.decoded_connection.lrange(f"{name}",0,-1)
+            int_sum_ct = 0
+            int_max_ct = 0
+            for item in lst_temp:
+                int_sum_ct = int_sum_ct + int(item)
+                if int(item) > int_max_ct:
+                    int_max_ct = int(item)
+            int_avg_ct = int(int_sum_ct/int_len_lst)
+            # response['avg_ct'] = int_avg_ct
+            # response['max_ct'] = int_max_ct
+            # response['msg'] = 'OK'
+            # response['code'] = 200
+            # return response
+            return int_avg_ct
+        else:
+            raise Exception("Redis尚未建立连接")
+    
     def llen(self, name):
         # 取得列表长度
         if self.__isconnected__:
@@ -111,3 +135,61 @@ class clsRedis:
             return
         else:
             raise Exception("Redis尚未建立连接")
+    def xadd(self, name, value ):
+        # 向stream增加值
+        # TODO 返回是否有元素重复
+        if self.__isconnected__:
+            self.decoded_connection.xadd (name,value)
+            return
+        else:
+            raise Exception("Redis尚未建立连接")
+ 
+    def xread_one(self, name):
+        # 从stream读取1条
+        if self.__isconnected__:
+            response = self.decoded_connection.xread (count=1,streams={f"{name}":0})
+            return response
+        else:
+            raise Exception("Redis尚未建立连接")   
+ 
+    def xread_all(self, name):
+        # 从stream读取所有
+        if self.__isconnected__:
+            response = self.decoded_connection.xread (streams={f"{name}":0})
+            # xread 返回值解析
+            # [
+            #  [stream_name, 
+            #   [
+            #    (redis_id1,{'id': '0', 'msg': 'ok', 'addr': 'abc'}), 
+            #    (redis_id2,{'id': '1', 'msg': 'ok', 'addr': 'abc'}),
+            #    (redis_id3,{'id': '1', 'msg': 'ok', 'addr': 'abc'})
+            #   ]
+            #  ]
+            # ]
+            # len(response)= 1:     streams的数量
+            # len(response[0]) =2   第一个streams 回复的信息，信息一定有两列组成
+            #       response[0][0] = stream_name 
+            #       response[0][1] = all_msg
+            # len(response[0][1]) = 3 信息的总行数( for index = 0~2 )
+            #       response[0][1][0] = (redis_id1,{'id': '0', 'msg': 'ok', 'addr': 'abc'})
+            #       response[0][1][1] = (redis_id2,{'id': '1', 'msg': 'ok', 'addr': 'abc'})
+            #       response[0][1][2] = (redis_id3,{'id': '1', 'msg': 'ok', 'addr': 'abc'})
+            # len(response[0][1][index]) = 2 每条信息都包含 Redis id 和信息本体 两部分
+            #       response[0][1][index][0] = redis_id1 
+            #       response[0][1][index][1] = {'id': '0', 'msg': 'ok', 'addr': 'abc'}
+            # len(response[0][1][index][1]) = 3 信息本体中 包含的键值数量( for key =  )
+            # 
+            # response = self.decoded_connection.xread (count=1, streams={f"{name}":0})
+            # print(response)
+            # response = self.decoded_connection.xread ({"f{name}":"0-0"})
+            return response
+        else:
+            raise Exception("Redis尚未建立连接")   
+
+    def xdel_one(self, name, msg_id):
+        # 从stream中删除1条
+        if self.__isconnected__:
+            response = self.decoded_connection.xdel (name,msg_id)
+            return response
+        else:
+            raise Exception("Redis尚未建立连接") 

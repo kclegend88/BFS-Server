@@ -7,7 +7,7 @@ from fConfigEx import clsConfigEx
 from fRedis import clsRedis
 
 def start_process(config_file):
-    __prc_name__="xxxx"
+    __prc_name__="stmP"
     
     ini_config = clsConfig(config_file)   # 来自主线程的配置文件
     inst_logger = clsLogger(ini_config)  
@@ -59,13 +59,15 @@ def start_process(config_file):
     
     b_thread_running = True
     int_exit_code = 0
+    int_stream_id = 0
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
         
         # --------------------
         # 主线程操作区
-        
+        inst_redis.xadd( "stream_test", {'id': int_stream_id ,'msg':'ok','addr':'abc'} )
+        int_stream_id = int_stream_id + 1
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
@@ -75,13 +77,16 @@ def start_process(config_file):
         td_last_ct = current_ts - prc_luts  # datetime对象相减得到timedelta对象
         int_last_ct_ms = int(td_last_ct.total_seconds()*1000) # 取得毫秒数（int格式)
         
-        prc_luts=current_ts # 刷新luts
+        prc_luts = current_ts # 刷新luts
         inst_redis.setkey(f"pro_mon:{__prc_name__}:lu_ts",current_ts.isoformat()) # 更新redis中的luts
-               
-        inst_redis.lpush(f"lst_ct:%s"%(__prc_name__,),int_last_ct_ms) # 将最新的ct插入redis中的lst_ct
-        int_len_lst= inst_redis.llen(f"lst_ct:%s"%(__prc_name__,))  # 取得列表中元素的个数
-        if int_len_lst > 10:
-            inst_redis.rpop(f"lst_ct:%s"%(__prc_name__,))    # 尾部数据弹出
+
+        _avg_ct = inst_redis.lpush_ct(f"lst_ct:%s"%(__prc_name__,),int_last_ct_ms)
+        inst_redis.setkey(f"pro_mon:{__prc_name__}:avg_ct",_avg_ct) # 更新redis中的luts
+        
+        # inst_redis.lpush(f"lst_ct:%s"%(__prc_name__,),int_last_ct_ms) # 将最新的ct插入redis中的lst_ct
+        # int_len_lst= inst_redis.llen(f"lst_ct:%s"%(__prc_name__,))  # 取得列表中元素的个数
+        # if int_len_lst > 10:
+        #    inst_redis.rpop(f"lst_ct:%s"%(__prc_name__,))    # 尾部数据弹出
         # cycletime 计算 与 healthy判断
         # ToDo 
         

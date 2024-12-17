@@ -7,7 +7,7 @@ from fConfigEx import clsConfigEx
 from fRedis import clsRedis
 
 def start_process(config_file):
-    __prc_name__="xxxx"
+    __prc_name__="stmC"
     
     ini_config = clsConfig(config_file)   # 来自主线程的配置文件
     inst_logger = clsLogger(ini_config)  
@@ -65,7 +65,11 @@ def start_process(config_file):
         
         # --------------------
         # 主线程操作区
-        
+        l = inst_redis.xread_one( "stream_test")
+        if len(l)>0 :
+            inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))        
+            resp = inst_redis.xdel_one( "stream_test",f"{l[0][1][0][0]}")
+            inst_logger.info("成功删除消息 1 条，id= %s ,返回 %s " %(f"{l[0][1][0][0]}",resp))  
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
