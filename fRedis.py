@@ -157,6 +157,7 @@ class clsRedis:
         if self.__isconnected__:
             response = self.decoded_connection.xread (streams={f"{name}":0})
             # xread 返回值解析
+            # 后续加入结构和流解析模块，返回解析后的数值
             # [
             #  [stream_name, 
             #   [
@@ -171,12 +172,17 @@ class clsRedis:
             #       response[0][0] = stream_name 
             #       response[0][1] = all_msg
             # len(response[0][1]) = 3 信息的总行数( for index = 0~2 )
+            #   for id, value in l[0][1]:  print( f"id: {id} value: {value[b'msg']}")
+            #   id: b'redis_id1' value: b'OK'
+            #   id: b'redis_id2' value: b'OK'
+            #   id: b'redis_id3' value: b'OK'
             #       response[0][1][0] = (redis_id1,{'id': '0', 'msg': 'ok', 'addr': 'abc'})
             #       response[0][1][1] = (redis_id2,{'id': '1', 'msg': 'ok', 'addr': 'abc'})
             #       response[0][1][2] = (redis_id3,{'id': '1', 'msg': 'ok', 'addr': 'abc'})
             # len(response[0][1][index]) = 2 每条信息都包含 Redis id 和信息本体 两部分
             #       response[0][1][index][0] = redis_id1 
             #       response[0][1][index][1] = {'id': '0', 'msg': 'ok', 'addr': 'abc'}
+            #       data_decoded = {key.decode(): value.decode() for key, value in response[0][1].items()}
             # len(response[0][1][index][1]) = 3 信息本体中 包含的键值数量( for key =  )
             # 
             # response = self.decoded_connection.xread (count=1, streams={f"{name}":0})
@@ -193,3 +199,27 @@ class clsRedis:
             return response
         else:
             raise Exception("Redis尚未建立连接") 
+          
+    def xcreategroup(self, sname, gname):
+        # 为每个线程创建一个组
+        if self.__isconnected__:
+            self.decoded_connection.xgroup_create (sname,gname, id=0)
+            return 
+        else:
+            raise Exception("Redis尚未建立连接")         
+    
+    def xreadgroup(self, sname,gname,cname):
+        # 使用组读取
+        if self.__isconnected__:
+            response= self.decoded_connection.xreadgroup (groupname=gname,consumername = cname,count=1,streams={f"{sname}":'>'})
+            return response
+        else:
+            raise Exception("Redis尚未建立连接")    
+            
+    def xack(self, sname,gname,sid):
+        # 使用组读取
+        if self.__isconnected__:
+            response= self.decoded_connection.xack(sname,gname,sid)
+            return response
+        else:
+            raise Exception("Redis尚未建立连接")    

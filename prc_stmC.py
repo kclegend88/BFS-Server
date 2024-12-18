@@ -25,6 +25,13 @@ def start_process(config_file):
     
     # 向Redis注册基本信息
     prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
+    
+    # 在Redis 注册一个线程组
+    if not inst_redis.xcreategroup("stream_test", __prc_name__):
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %(__prc_name__,))
+    else:
+        inst_logger.info("线程 %s 注册stream组成功" %(__prc_name__,))
+        
     if prc_run_lock is None:    
         # Redis中不存在该线程的运行锁，说明没有同名线程正在运行，无线程冲突，可以直接启动
         # 增加Redis中总线程计数器，并将增加后的计数器值作为当前线程的id
@@ -65,11 +72,25 @@ def start_process(config_file):
         
         # --------------------
         # 主线程操作区
-        l = inst_redis.xread_one( "stream_test")
-        if len(l)>0 :
+        # l = inst_redis.xread_one( "stream_test")
+        # 将线程名称作为组名称，将线程ID作为消费者名称
+        # 当现场死锁导致信息呗pending时，应考虑读取pending list 进行处理; 处理完成的应及时回传ACK
+        l = inst_redis.xreadgroup("stream_test",__prc_name__,__prc_id__)
+        print(l)
+        if len(l[0][1])>0 :
             inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))        
-            resp = inst_redis.xdel_one( "stream_test",f"{l[0][1][0][0]}")
-            inst_logger.info("成功删除消息 1 条，id= %s ,返回 %s " %(f"{l[0][1][0][0]}",resp))  
+            # resp = inst_redis.xdel_one( "stream_test",f"{l[0][1][0][0]}")
+            # inst_logger.info("成功删除消息 1 条，id= %s ,返回 %s " %(f"{l[0][1][0][0]}",resp)) 
+            resp = inst_redis.xack("stream_test",__prc_name__,f"{l[0][1][0][0]}")
+            inst_logger.info("成功ACK消息 1 条，id= %s ,返回 %s " %(f"{l[0][1][0][0]}",resp))
+            # toack = lambda k,g,e: r.xack( k,g, e )
+            # print_xreadgroup_reply( d, group=group1, run=toack )
+            # def print_xreadgroup_reply( reply, group = None, run = None):
+            # for d_stream in reply:
+            #    for element in d_stream[1]:
+            #       print(  f"got element {element[0]}"+ f"from stream {d_stream[0]}" )
+            #       if run is not None:
+            #          run( d_stream[0], group, element[0] )
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
