@@ -31,3 +31,7 @@ Create prc_template V 0.2.0
 	
 # Rev 0.2.1
 Write fPLC process, main thread of PLC logi finished,need to upgrade;
+
+# Rev 0.2.2
+Write HIKCamera Network ,read success,not push into Redis yet
+Fix fLog lineno and filename bug(stack level=2)

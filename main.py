@@ -8,8 +8,9 @@ from fLog import clsLogger
 from fConfig import clsConfig
 from fRedis import clsRedis
 
-from prc_stmP import start_process as start_stmP
-from prc_stmC import start_process as start_stmC
+#from prc_stmP import start_process as start_stmP
+#from prc_stmC import start_process as start_stmC
+from prc_HIKCamera import start_process as start_HIKCamera
 
 class main:
     def __init__(self):
@@ -17,7 +18,7 @@ class main:
         __version__='0.1.0'
         
         # 定义线程总表，所有在该表格中的线程由main启动并监控
-        self.lst_thread_name = ["stmP", "stmC"]
+        self.lst_thread_name = ["HIKCamera"]
         
 
     def run(self):
