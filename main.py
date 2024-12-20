@@ -11,6 +11,7 @@ from fRedis import clsRedis
 #from prc_stmP import start_process as start_stmP
 #from prc_stmC import start_process as start_stmC
 from prc_HIKCamera import start_process as start_HIKCamera
+from prc_PLC import start_process as start_PLC
 
 class main:
     def __init__(self):
@@ -18,7 +19,7 @@ class main:
         __version__='0.1.0'
         
         # 定义线程总表，所有在该表格中的线程由main启动并监控
-        self.lst_thread_name = ["HIKCamera"]
+        self.lst_thread_name = ["HIKCamera", "PLC"]
         
 
     def run(self):
@@ -56,7 +57,7 @@ class main:
             inst_logger.info("Redis 数据清理成功")
             
         except:
-            inst_logger.error ("Redis连接失败"+traceback.format_exc())
+            inst_logger.error("Redis连接失败"+traceback.format_exc())
             exit()
         
         # 尝试启动线程

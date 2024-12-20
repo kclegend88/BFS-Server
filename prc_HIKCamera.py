@@ -30,6 +30,7 @@ def start_process(config_file):
     __prc_tcp_ip = __ini_prc_config__.Network.Barcode_Reading_IP
     __prc_tcp_port = __ini_prc_config__.Network.Barcode_Reading_Port
 
+    
     # 向Redis注册基本信息
     prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
     if prc_run_lock is None:    
@@ -54,7 +55,6 @@ def start_process(config_file):
         inst_redis.setkey(f"pro_mon:{__prc_name__}:lu_ts",prc_luts.isoformat())
         
         # 将当前线程加入Redis 线程集合中
-
         inst_redis.sadd("set_process","name=%s/id=%d"%(__prc_name__,__prc_id__))
         inst_logger.info("线程 %s 已添加至线程集合中" %(__prc_name__,))
                 
