@@ -233,7 +233,7 @@ class clsRedis:
         else:
             raise Exception("Redis尚未建立连接")
  
-     def getset(self, key):
+    def getset(self, key):
         # 获取集合
         if self.__isconnected__:
             value = self.decoded_connection.smembers(f"{key}")
