@@ -34,11 +34,25 @@ def start_process(config_file):
     def prc_HC_recvData():
         # 处理接收到的数据
         # Redis 插入子函数，将数据插入stream,
-        nonlocal cli,inst_logger,inst_redis
+        nonlocal cli,inst_logger,inst_redis,prc_tp_luts,prc_tp_counter
         
         for i,d in enumerate(cli.lstValidData):               
-            inst_redis.xadd( "stream_test", d)
-                
+            inst_redis.xadd( "stream_test", d)      # 插入stream
+            
+            current_ts=datetime.datetime.now()      
+            td_last_ct = current_ts - prc_tp_luts          
+            int_last_ct_ms = int(td_last_ct.total_seconds()*1000) 
+            
+            prc_tp_luts = current_ts
+            prc_tp_counter = prc_tp_counter + 1
+            inst_redis.setkey(f"tp:scanner_tp_short:lu_ts",prc_tp_luts.isoformat())
+            inst_redis.setkey(f"tp:scanner_tp_short:counter",prc_tp_counter)           
+            
+            resp = inst_redis.lpush_ct(f"lst_ct:scanner_tp_short",int_last_ct_ms)
+            if prc_tp_counter % 10 == 0:
+                resp_long = inst_redis.lpush_ct(f"lst_ct:scanner_tp_long",resp['avg_ct'])
+                inst_logger.debug("扫描流量数据已更新，scanner_tp_short = %d, scanner_tp_long = %d"%(3600000//resp['avg_ct'],3600000//resp_long['avg_ct']))    
+
         # only for debug, add recv-data directly to stream_buf
         # ----------------
         inst_logger.debug("已收到报文 %s " %(cli.recv_buf,))
@@ -49,6 +63,7 @@ def start_process(config_file):
         cli.recv_buf.clear()            # 清理接收数据缓冲区
         cli.lstValidData.clear()        # 清理有效数据缓冲区
         cli.bRecvValidData = False;     # 清理有效数据标志位
+        # ToDo 后续要考虑为数据处理加互锁，避免正在插入数据时，数据被清理
     
     def prc_HC_heartbeat():
         nonlocal heart_luts,inst_logger,inst_redis,__prc_name__,cli
@@ -115,6 +130,11 @@ def start_process(config_file):
         # 记录线程上次刷新时间，用于持续计算线程的cycletime
         prc_luts=__prc_start_ts__
         inst_redis.setkey(f"pro_mon:{__prc_name__}:lu_ts",prc_luts.isoformat())
+
+        prc_tp_luts=__prc_start_ts__    # 用于计算流量的luts
+        prc_tp_counter = 0
+        inst_redis.setkey(f"tp:scanner_tp_short:lu_ts",prc_tp_luts.isoformat())
+        inst_redis.setkey(f"tp:scanner_tp_short:counter",prc_tp_counter)
         
         # 将当前线程加入Redis 线程集合中
         inst_redis.sadd("set_process","name=%s/id=%d"%(__prc_name__,__prc_id__))
@@ -186,7 +206,7 @@ def start_process(config_file):
             if not cli.bExit:
                 cli.shutdown()                              # 关闭Socket 
                 inst_logger.info("线程 %s 尝试关闭网络监听线程"%(__prc_name__,))
-                while (int_last_ct_ms < 10000) | cli.bExit :# 等待监听线程退出，最多等待 10s
+                while (int_last_ct_ms < 10000) and not cli.bExit :# 等待监听线程退出，最多等待 10s
                     current_ts=datetime.datetime.now()      # 计算等待时间
                     td_last_ct = current_ts - prc_luts          
                     int_last_ct_ms = int(td_last_ct.total_seconds()*1000) 

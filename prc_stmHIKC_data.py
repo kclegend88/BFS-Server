@@ -5,9 +5,10 @@ from fLog import clsLogger
 from fConfig import clsConfig
 from fConfigEx import clsConfigEx
 from fRedis import clsRedis
+import ast
 
 def start_process(config_file):
-    __prc_name__="xxxx"
+    __prc_name__="stmHIKC_data"
     
     ini_config = clsConfig(config_file)   # 来自主线程的配置文件
     inst_logger = clsLogger(ini_config)  
@@ -57,15 +58,47 @@ def start_process(config_file):
         inst_logger.error("线程 %s 启动时发现了运行冲突,同名线程已存在,id= %d"%(__prc_name__,prc_run_lock))
         exit()
     
+    if not inst_redis.xcreategroup("stream_test", "HIKC_data"):
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("HIKC_data",))
+    else:
+        inst_logger.info("线程 %s 注册stream组成功" %("HIKC_data",))
+    
     b_thread_running = True
     int_exit_code = 0
+    
+    dictdata=[]
+    lstdictdata={}
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
-        
+
         # --------------------
         # 主线程操作区
-        
+        l = inst_redis.xreadgroup("stream_test","HIKC_data","HIKC_data-id01")
+
+        if len(l)>0 :                       # 收到消息
+            print(l)                        # Only for debug
+            inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
+            for i,v in l[0][1]:             # 遍历收到的所有消息
+                dictdata = v                # redis decoding返回的是dict格式
+                inst_redis.setkey(f"parcel:sid:{dictdata['uid']}",i)                    # uid对应的Stream id，用于翻查后从序列内删除
+                inst_redis.setkey(f"parcel:posx:{dictdata['uid']}",dictdata['pos_x'])   # uid对应的包裹沿传输方向的位置，单位为mm，定时增加
+                inst_redis.setkey(f"parcel:posy:{dictdata['uid']}",dictdata['pos_y'])   # uid对应的包裹沿宽度方向的位置，单位为mm，左侧为零
+                if dictdata['result']=='GR':                                            # 正常识读
+                    inst_redis.setkey(f"parcel:barcode:{dictdata['uid']}",dictdata['code']) # uid对应的包裹，正确识读出来的条码 
+                    inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'GR')         # uid对应的包裹，扫描结果 GR 
+                    inst_redis.sadd("set_reading_gr", dictdata['code'])                     # GR的包裹，将条码加入set_reading_gr
+                    # barcode check dictdata['code']
+                elif dictdata['result']=='MR':                                          # 多条码
+                    inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'MR')         # uid对应的包裹，扫描结果 MR
+                    inst_redis.setkey(f"parcel:barcode:{dictdata['uid']}",dictdata['code']) # uid对应的包裹，多条码读取出来的条码 
+                    inst_redis.sadd("set_reading_mr", dictdata['code'])                     # MR的包裹，将条码加入set_reading_mr
+                    inst_redis.setkeypx(f"plc_conv:fullspeed",“countdown”,15000)            # slow down conv
+                    
+                elif dictdata['result']=='NR':      # 无条码    
+                    inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'NR')     # uid对应的包裹，扫描结果 NR
+                    inst_redis.sadd("set_reading_nr", dictdata['uid'])                  # NR的包裹，无条码，将uid加入set_reading_nr
+                    inst_redis.setkeypx(f"plc_conv:fullspeed",“countdown”,15000)        # slow down conv
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
@@ -99,7 +132,7 @@ def start_process(config_file):
         if prc_run_lock == "exit":
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
-            int_exit_code = 2           
+            int_exit_code = 2          
             break
     
     inst_logger.info("线程 %s 已退出，返回代码为 %d" %(__prc_name__,int_exit_code))

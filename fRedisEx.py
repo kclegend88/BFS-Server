@@ -7,13 +7,14 @@ from fConfig import clsConfig
 class clsRedis:
     _instance = None
 
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super(clsRedis, cls).__new__(cls)
-            cls._instance.init(*args, **kwargs)
-        return cls._instance
+#    def __new__(cls, *args, **kwargs):
+#        if cls._instance is None:
+#            cls._instance = super(clsRedis, cls).__new__(cls)
+#            cls._instance.init(*args, **kwargs)
+#        return cls._instance
 
-    def init(self, config_file):
+#    def init(self, config_file):
+    def __init__(self, config_file):
         self.ini_config = clsConfig(config_file)
 
     def connect(self, config_file):
@@ -204,7 +205,7 @@ class clsRedis:
     def xcreategroup(self, sname, gname):
         # 为每个线程创建一个组
         if self.__isconnected__:
-            self.decoded_connection.xgroup_create (sname,gname, id=0, mkstream=True)
+            self.decoded_connection.xgroup_create (sname,gname, id=0)
             return 
         else:
             raise Exception("Redis尚未建立连接")         
