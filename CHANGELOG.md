@@ -35,3 +35,23 @@ Write fPLC process, main thread of PLC logi finished,need to upgrade;
 # Rev 0.2.2
 Write HIKCamera Network ,read success,not push into Redis yet
 Fix fLog lineno and filename bug(stack level=2)
+
+# Rev 0.2.3
+Merge LQW prc_monitor and BFS, PLC and so on
+
+# Rev 0.2.4
+updated HIKCamera  communication function，barcode and heartbeat can send and recv by pro_HIKCamera and write to stream_test in Redis
+
+# Rev 0.2.5
+Update HIKCamera, insert scan data into stream_test; add throughput calc for short term and long term; fix thread exit bug
+Update fRedis, lpush_ct calc and return avg_ct,max_ct
+fix fRedis xccreategroup bug, when stream not existing, create an empty stream
+Add stmHIKC data process, read stream_test  and insert into key-value, if nr or mr ,slow down conv
+
+# Rev 0.2.6
+create fBarcode for barcode check(now empty)
+update HIKC network thread, add unpack recv buf funtion
+
+add main_cli, prc_cli_manualscan, get input barcode, re function check barcode, add ms code into stm_ms 
+
+add stm manualscan, read from stm_ms and add to set.

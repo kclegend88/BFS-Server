@@ -15,6 +15,7 @@ class clsRedis:
 
 #    def init(self, config_file):
     def __init__(self, config_file):
+        self.__isconnected__ = False
         self.ini_config = clsConfig(config_file)
 
     def connect(self, config_file):

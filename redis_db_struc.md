@@ -1,5 +1,6 @@
 Key:
-sys:device_name,string		 	# 设备名称，main.py首次连接redis时写入
+sys:ready						# 设备主程序运行标志位 
+sys:device_name		 			# string 设备名称，main.py首次连接redis时写入
 
 pro_mon:<prc_name>:run_lock		# 现场运行锁，该key为空说明无此线程，如该线程为整数说明线程id为该整数的线程正在运行中;
 								  每个线程均会判断这个key的状态，一旦发现该key不存在，将立刻终止当前线程
@@ -18,11 +19,11 @@ tp:scanner_tp_short:lu_ts		# 用于计算scanner流量的luts
 tp:scanner_tp_short:counter		# 读码报文计数器 也用于生成tp_long的辅助计数器
 
 
-parcel:barcode:<uid>			#指定扫描uid得到的条码
-parcel:sid:<uid>				#指定扫描uid 在stream_test中的stream id，用于后续删除stream中的对象
-parcel:posx:<uid>				#指定扫描uid的x坐标，随PLC转动不断更新
-parcel:posy:<uid>				#指定扫描uid的y坐标，不会更新
-parcel:scan_result:<uid>		#指定扫描uid的扫描结果，GR/MR/NR
+parcel:barcode:<uid>			# 指定扫描uid得到的条码
+parcel:sid:<uid>				# 指定扫描uid 在stream_test中的stream id，用于后续删除stream中的对象
+parcel:posx:<uid>				# 指定扫描uid的x坐标，随PLC转动不断更新
+parcel:posy:<uid>				# 指定扫描uid的y坐标，不会更新
+parcel:scan_result:<uid>		# 指定扫描uid的扫描结果，GR/MR/NR
 
 
 Set:
@@ -36,7 +37,7 @@ lst_ct:<prc_name>				# 长度为10的数组，记录最近10次线程的cycle ti
 lst_ct:scanner_tp_short			# 长度为10的数组，记录读码报文返回的cycle time MR/GR/NR每件都算
 lst_ct:scanner_tp_long			# 长度为10的数组，scanner_tp_short中每10个包裹的平均ct作为元素
 
-Stream
+Stream:
 stream_test						# 测试用stream 
 								['uid']		:36位uid MR时带后缀 -0 -1 -2....
 								['req_ts']	:时间戳 

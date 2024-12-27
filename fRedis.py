@@ -28,6 +28,7 @@ class clsRedis:
         # ToDo 当前未使用配置文件中的IP与端口，也未处理配置文件中上述信息缺失可能导致的异常退出
         # ToDo 当Redis连接出现异常时，Redis是否自动重新连接尚未有结论，重连机制是否需要主线程参与需要详细测试后得出结论
         self.decoded_connection = redis.Redis(decode_responses=True)
+        print(self.decoded_connection)
         if self.decoded_connection.ping():
             self.__isconnected__ = True
             return

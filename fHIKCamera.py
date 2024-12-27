@@ -32,7 +32,7 @@ class clsHIKCameraClient:
         self.lstValidData = []          # 有效数据缓存区，字典格式
         self.threadhandler = None       # 
         self.intValidFaultNo= 0         
-    
+        self.lstUnpackBuf = []
 
     #创建Socket套接字，返回值为True表示连接成功 
     def connect(self):
@@ -73,20 +73,23 @@ class clsHIKCameraClient:
                 # 收到不为空的数据
                 # ToDo  如果收到超长数据，需要存下来
                 #       上次缓存的校验失败数据，与本次读取的拼成一个包，再校验一次
-                validdata = self.check_recvbuf(data)    # 数据校验
-                if validdata:    # 数据有效性校验通过
-                    data_type = validdata['type']           # 确认消息类型，9000为心跳信号，1001为有效报文
-                    if data_type == 9000:                   # 心跳信号    (数字 9000)
-                        self.int_heart_counter = self.int_heart_counter + 1 
-                    elif data_type == '1001':               # 收到正式报文（字符串1001尚不清楚）
-                        self.int_msg_counter = self.int_msg_counter + 1
-                        self.convert_recvbuf(validdata)     # 数据处理函数，将缓冲区内的数据转换成期望的dict格式 
-                        self.recv_buf.append(data)          # only for debug/接收缓冲区的原文
-                        if len(self.lstValidData ) > 10:        # 有效数据缓冲区太满，说明主线程处理太慢
-                            self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':'有效数据缓冲区内数据过多，请及时处理！！'})
-                else:                                   # 未预料的数据包，或超长数据
-                    self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':"接收缓冲区校验失败,错误代码%d, 缓存区数据:%s"%(self.intValidFaultNo,data.decode('utf-8'))})
-                    # ToDo缓存校验失败的数据，与下一次读取的拼成一个包，再校验一次
+                self.lstUnpackBuf = self.unpack_buf(data)
+                for i,data_item in enumerate(self.lstUnpackBuf):
+                    validdata = self.check_recvbuf(data_item)    # 数据校验
+                    if validdata:    # 数据有效性校验通过
+                        data_type = validdata['type']           # 确认消息类型，9000为心跳信号，1001为有效报文
+                        if data_type == 9000:                   # 心跳信号    (数字 9000)
+                            self.int_heart_counter = self.int_heart_counter + 1 
+                        elif data_type == '1001':               # 收到正式报文（字符串1001尚不清楚）
+                            self.int_msg_counter = self.int_msg_counter + 1
+                            self.convert_recvbuf(validdata)     # 数据处理函数，将缓冲区内的数据转换成期望的dict格式 
+                            self.recv_buf.append(data)          # only for debug/接收缓冲区的原文
+                            if len(self.lstValidData ) > 10:        # 有效数据缓冲区太满，说明主线程处理太慢
+                                self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':'有效数据缓冲区内数据过多，请及时处理！！'})
+                    else:                                   # 未预料的数据包，或超长数据
+                        self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':"接收缓冲区校验失败,错误代码%d, 缓存区数据:%s"%(self.intValidFaultNo,data.decode('utf-8'))})
+                        # ToDo缓存校验失败的数据，与下一次读取的拼成一个包，再校验一次
+                self.lstUnpackBuf.clear()
                 time.sleep(0.1)        
             except Exception as e:
                 self.bDISCONNECT = True
@@ -96,7 +99,31 @@ class clsHIKCameraClient:
         self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':"线程退出，编号:%d"%(self.int_thread_counter,)})
         time.sleep(3)       # 等待exception 消息输出
         self.bExit = True
+    
+    # 缓存区数据的拼接和分割
+    def unpack_buf(self,data_buf):
+        lst_uppack_buf = []
+        recv_data = data_buf.decode('utf-8')            # b'' Byte类型转成json字符串
+        # 如果数据长度小于1024，只有一个{ 只有一个} 直接返回
+        if recv_data.startswith('{'):                 # 完整前缀
+            if recv_data.endswith('}'):               # 完整后缀
+                if recv_data.find('}{') == -1:       # 不存在包黏连
+                    lst_uppack_buf.append(recv_data)
+                    
+                else:                               # 有包黏连
+                    new_recv_data = recv_data.replace('}{','}^{')
+                    lst_uppack_buf = new_recv_data.split('^')
+                    self.lstException.append({'module':'clsHIKCameraClient.unpack_buf', 'timestamp':datetime.datetime.now().isoformat(),'msg':"发现黏连的数据包，个数:%d"%(len(lst_uppack_buf),)})
+                return lst_uppack_buf
+            else:                                   # 后缀不完整，ToDo要将这段数据存起来，等着下一次读取的拼在一起
+                self.lstException.append({'module':'clsHIKCameraClient.unpack_buf', 'timestamp':datetime.datetime.now().isoformat(),'msg':"发现数据包后缀不完整"})
+                return None
+        else:                                       # 开头不完整，ToDo要与上一次的数据拼在一起
+            self.lstException.append({'module':'clsHIKCameraClient.unpack_buf', 'timestamp':datetime.datetime.now().isoformat(),'msg':"发现数据包前缀不完整"})
+            return None 
         
+
+    
     # 数据处理函数 判断数据长度，区分数据类型，尝试拼接数据，如拼接异常则需要输出停机指令
     def check_recvbuf(self, data_buf):
         # 首先检查数据完整性，如果数据完整且小于缓冲区总长度，则直接输出
@@ -104,7 +131,8 @@ class clsHIKCameraClient:
         # 每次收数据都查历史拼接异常的，如果拼接异常的数据收到之后，已有至少两个完整数据输出，则认为拼接无望，需要输出报错信息
         # 一个超长报文可能是多条码（例如超过50个条码)，一旦收到这样的信息，要谨慎对待，有可能需要立刻停机
         try:
-            recv_data = data_buf.decode('utf-8')            # b'' Byte类型转成json字符串
+            recv_data = data_buf            # json字符串
+            # recv_data = data_buf.decode('utf-8')            # b'' Byte类型转成json字符串
             #Todo 判断 是否包含非法字符
             # str_re = u'!@#$%^&*()-=_+'
             # if "?" in data:
