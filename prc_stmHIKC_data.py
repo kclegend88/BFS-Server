@@ -77,7 +77,7 @@ def start_process(config_file):
         l = inst_redis.xreadgroup("stream_test","HIKC_data","HIKC_data-id01")
 
         if len(l)>0 :                       # 收到消息
-            print(l)                        # Only for debug
+            # print(l)                        # Only for debug
             inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
             for i,v in l[0][1]:             # 遍历收到的所有消息
                 dictdata = v                # redis decoding返回的是dict格式
@@ -88,16 +88,32 @@ def start_process(config_file):
                     inst_redis.setkey(f"parcel:barcode:{dictdata['uid']}",dictdata['code']) # uid对应的包裹，正确识读出来的条码 
                     inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'GR')         # uid对应的包裹，扫描结果 GR 
                     inst_redis.sadd("set_reading_gr", dictdata['code'])                     # GR的包裹，将条码加入set_reading_gr
+
+                    # Only for debug
+                    inst_logger.debug("读取结果 %s, 条码 %s, " %(dictdata['result'],dictdata['code']))        
+                    # Only for debug
+
                     # barcode check dictdata['code']
+                    # check set_MAWB
                 elif dictdata['result']=='MR':                                          # 多条码
                     inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'MR')         # uid对应的包裹，扫描结果 MR
                     inst_redis.setkey(f"parcel:barcode:{dictdata['uid']}",dictdata['code']) # uid对应的包裹，多条码读取出来的条码 
                     inst_redis.sadd("set_reading_mr", dictdata['code'])                     # MR的包裹，将条码加入set_reading_mr
+
+                    # Only for debug
+                    inst_logger.debug("读取结果 %s, 条码 %s, " %(dictdata['result'],dictdata['code']))        
+                    # Only for debug
+
                     # inst_redis.setkeypx(f"plc_conv:fullspeed","countdown",15000)            # slow down conv
                     
                 elif dictdata['result']=='NR':      # 无条码    
                     inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'NR')     # uid对应的包裹，扫描结果 NR
                     inst_redis.sadd("set_reading_nr", dictdata['uid'])                  # NR的包裹，无条码，将uid加入set_reading_nr
+
+                    # Only for debug
+                    inst_logger.debug("读取结果 %s, 条码 xxxxxxx, " %(dictdata['result'],))        
+                    # Only for debug
+
                     # inst_redis.setkeypx(f"plc_conv:fullspeed","countdown",15000)        # slow down conv
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储

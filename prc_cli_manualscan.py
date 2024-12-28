@@ -36,8 +36,8 @@ def start_process(config_file):
     
     # 向Redis注册基本信息，允许同名客户端，根据已注册的同名客户端自动取得两位数的尾号，不允许超过90个同名客户端在线
     prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
+    index = 0
     if prc_run_lock:
-        index = 0
         while prc_run_lock:
             index = index + 1
             if index > 90:
@@ -74,6 +74,10 @@ def start_process(config_file):
    
     b_thread_running = True
     int_exit_code = 0
+    lst_reading_gr =[]
+    lst_reading_nr =[]
+    lst_reading_mr =[]
+    
     while b_thread_running:
         # 刷新当前线程的运行锁
         # inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
@@ -84,18 +88,31 @@ def start_process(config_file):
         strManualScanBarcode = input("please enter manual scan barcode...")
         
         # 更新set_reading_gr
-        
-        # 更新set_reading_mr
-        
+        lst_reading_gr = inst_redis.getset("set_reading_gr")
         # 更新set_reading_nr
-                
+        # lst_reading_nr = inst_redis.getset("set_reading_nr")
+        # 更新set_reading_mr
+        lst_reading_mr = inst_redis.getset("set_reading_mr")         
+
+        if strManualScanBarcode in lst_reading_gr:
+            print("Barcode is already exist!!")
+            continue
+        
+        if strManualScanBarcode in lst_reading_mr:      
+            print("Get MRead Barcode !!")
+            inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode.'type':'MR'})      # 插入 Manual Scan stream/MR
+            continue
+        
         # 条码格式校验
+        bBarcodeValid = False
         for i, re_exp in enumerate(lst_re_exp):
             if barcode_formatcheck(strManualScanBarcode,re_exp):
-                inst_redis.xadd( "stream_manualscan", {'scanid':__prc_id__,'barcode':strManualScanBarcode})      # 插入 Manual Scan stream
+                inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode.'type':'NR'})      # 插入 Manual Scan stream/NR
                 print("Barcode valid,insert into system")
+                bBarcodeValid = True
                 break
-        print("Barcode is not valid!!")
+        if not bBarcodeValid:
+            print("Barcode is not valid!!")
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         

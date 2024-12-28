@@ -48,7 +48,17 @@ stream_test						# 测试用stream
 stream_buf						# 调试用stream
 								['buf'] = 'read'
 								['data'] = b''	: recv_buf中收到的数据
+stream_reading_confirm			# 已经确认的条码 
+								['uid']		:36位uid MR时带后缀 -0 -1 -2....
+								['ts']		:确认的时间戳 
+								['barcode']	:条码
+								['scan_result']		:读取结果，GR/MR_MS/NR_MS
+								['check_result']	:检查结果，OK/RC/BL/OP/NF/SF
+								['remark']			:用来存补码的过程的，包括cli_id, scan_id 等;
 								
-								
-								
+stream_manualscan				# 测试用stream 
+								['cli_id']	:客户端编号
+								['scan_id']	:扫描编号 
+								['barcode']	:条码
+								['type']	:MR/NR
 								

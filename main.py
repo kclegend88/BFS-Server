@@ -49,13 +49,12 @@ class main:
                 # 其他main线程正在运行中，强制退出
                 inst_logger.error("已有程序运行中，本程序将退出！！！")
                 exit()
-            
-            inst_redis.setkey(f"sys:ready", "true")
 
             inst_logger.info("Redis 连接成功")
             
             inst_redis.flushall()
             inst_logger.info("Redis 数据清理成功")
+            inst_redis.setkey(f"sys:ready", "true")
             
         except:
             inst_logger.error("Redis连接失败"+traceback.format_exc())

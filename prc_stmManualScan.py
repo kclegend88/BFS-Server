@@ -78,7 +78,7 @@ def start_process(config_file):
 
         if len(l)>0 :                       # 收到消息
             print(l)                        # Only for debug
-            inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
+            inst_logger.info("收到补码扫描序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
             for i,v in l[0][1]:             # 遍历收到的所有消息
                 dictdata = v                                            # redis decoding返回的是dict格式
                 inst_redis.sadd("set_manualscan", dictdata['code'])     # 将条码加入set_manualscan

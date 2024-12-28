@@ -38,7 +38,7 @@ def start_process(config_file):
         
         for i,d in enumerate(cli.lstValidData):               
             inst_redis.xadd( "stream_test", d)      # 插入stream
-            
+
             current_ts=datetime.datetime.now()      
             td_last_ct = current_ts - prc_tp_luts          
             int_last_ct_ms = int(td_last_ct.total_seconds()*1000) 
@@ -55,7 +55,7 @@ def start_process(config_file):
 
         # only for debug, add recv-data directly to stream_buf
         # ----------------
-        inst_logger.debug("已收到报文 %s " %(cli.recv_buf,))
+        # inst_logger.debug("已收到报文 %s " %(cli.recv_buf,))
         for i,r in enumerate(cli.recv_buf):               
             inst_redis.xadd( "stream_buf", {'buf':'read','data':r})
         # ----------------
@@ -64,6 +64,9 @@ def start_process(config_file):
         cli.lstValidData.clear()        # 清理有效数据缓冲区
         cli.bRecvValidData = False;     # 清理有效数据标志位
         # ToDo 后续要考虑为数据处理加互锁，避免正在插入数据时，数据被清理
+        
+        # 有数据接收就不需要发心跳
+        heart_luts= datetime.datetime.now()
     
     def prc_HC_heartbeat():
         nonlocal heart_luts,inst_logger,inst_redis,__prc_name__,cli
@@ -73,6 +76,7 @@ def start_process(config_file):
         int_heart_ct = int(td_heart_ct.total_seconds())
             
         if int_heart_ct > 5:    # 每5秒发送一次心跳，ToDo 这个数字5今后要放到的ini里
+            heart_luts= datetime.datetime.now()
             try:
                 inst_redis.setkey(f"pro_mon:{__prc_name__}:receive_heart",cli.int_heart_counter)
                 inst_redis.setkey(f"pro_mon:{__prc_name__}:receive_buf",cli.int_msg_counter)

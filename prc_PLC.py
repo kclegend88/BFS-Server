@@ -87,6 +87,9 @@ def start_process(config_file):
     b_thread_running = True
     int_exit_code = 0
     is_locked = False
+    
+    lst_parcel_keys =[]
+    dict_reading_con = {}
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock", __prc_id__, __prc_expiretime)
@@ -96,7 +99,7 @@ def start_process(config_file):
         plc_conv_command = inst_redis.getkey("plc_conv:command")
         plc_conv_status = inst_redis.getkey("plc_conv:status")
         plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
-        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_time = datetime.datetime.now().isoformat()
         # 启动
         if plc_conv_command == "start":
             is_locked = False
@@ -106,7 +109,7 @@ def start_process(config_file):
             inst_redis.setkey(f"plc_conv:fullspeed", "Yes")
             for i in range(1, 5):
                 inst_redis.setkey(f"plc_conv:CV0{i}:speed", "high")
-            inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: start")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: start")
             inst_logger.info("线程 %s 皮带机启动，速度为高速" % (__prc_name__,))
             inst_redis.clearkey('plc_conv:command')
         # 停止
@@ -117,7 +120,7 @@ def start_process(config_file):
             inst_redis.setkey("plc_conv:status", "pause")
             for i in range(1, 5):
                 inst_redis.setkey(f"plc_conv:CV0{i}:speed", "stop")
-            inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: stop")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: stop")
             inst_logger.info("线程 %s 皮带机停止，速度为0" % (__prc_name__,))
             inst_redis.clearkey('plc_conv:fullspeed')
             inst_redis.clearkey('plc_conv:command')
@@ -132,7 +135,7 @@ def start_process(config_file):
             __inst_plc__.db_write(12, 7, bytearray([1]))
             __inst_plc__.db_write(12, 11, bytearray([1]))
             __inst_plc__.db_write(12, 15, bytearray([3]))
-            inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down")
             inst_logger.info("线程 %s 皮带机减速，速度为降速" % (__prc_name__,))
 
         # 减速到高速
@@ -141,7 +144,7 @@ def start_process(config_file):
                 __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([3]))
             for i in range(1, 5):
                 inst_redis.setkey(f"plc_conv:CV0{i}:speed", "high")
-            inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down ——》 high")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down ——》 high")
             inst_logger.info("线程 %s 皮带机从减速变为高速，速度为高速" % (__prc_name__,))
         # 减速变成停止
         if plc_conv_status == 'run' and plc_conv_fullspeed is None:
@@ -155,9 +158,9 @@ def start_process(config_file):
             __inst_plc__.db_write(12, 11, bytearray([0]))
             __inst_plc__.db_write(12, 15, bytearray([3]))
             inst_redis.setkey("plc_conv:status", "pause")
-            inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down stop")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down stop")
             inst_logger.info("线程 %s 皮带机从异常到停止，速度为0" % (__prc_name__,))
-        # 计算每个包裹X位置
+        # 计算每个包裹X位置 此段代码后续需要移动至专门的文件中，否则一旦出错就会与PLC断联
         plc_conv_status = inst_redis.getkey("plc_conv:status")
         if plc_conv_status == 'run':
             plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
@@ -168,7 +171,42 @@ def start_process(config_file):
             else:
                 speed_x = 0
             # 遍历所有包裹 所有包裹加上speed_x 加上后判断是否超过上限
-
+            lst_parcel_keys=inst_redis.keys('parcel:posx:')
+#            for i,key in enumerate(lst_parcel_keys):
+            for i,key in enumerate(lst_parcel_keys):
+                inst_redis.incrkey(f"{key}", incrby = speed_x)
+                if int(inst_redis.getkey(f"{key}")) > __ini_conv_length:
+                    lst_splited_keys = key.split(':')
+                    str_uid = lst_splited_keys[-1]
+                    str_result = inst_redis.getkey(f"parcel:scan_result:{str_uid}")
+                    str_barcode = inst_redis.getkey(f"parcel:barcode:{str_uid}")
+                    
+                    if not str_result in ['GR','MR_MS','NR_MS']:
+                        # 有异常包裹流出
+                        inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}") 
+                        # 发送停线指令
+                        inst_redis.setkey(f"plc_conv:command", "stop")
+                    else:
+                        dict_reading_con['uid'] = str_uid
+                        dict_reading_con['ts'] = datetime.datetime.now().isoformat()
+                        dict_reading_con['barcode'] = str_barcode
+                        dict_reading_con['scan_result'] = str_result
+                        # dict_reading_con['check_result'] = inst_redis.getkey(f"parcel:check_result:{str_uid}")
+                        # dict_reading_con['remark'] = inst_redis.getkey(f"parcel:remark:{str_uid}")                   
+                        
+                        inst_redis.xadd( "stream_reading_confirm", dict_reading_con)      # 插入stream
+                        
+                        # 清理redis中CV03上的包裹信息
+                        inst_redis.clearkey(f"{key}")
+                        inst_redis.clearkey(f"parcel:posy:{lst_splited_keys[-1]}")
+                        inst_redis.clearkey(f"parcel:sid:{lst_splited_keys[-1]}")
+                        inst_redis.clearkey(f"parcel:scan_result:{lst_splited_keys[-1]}")
+                        inst_redis.clearkey(f"parcel:barcode:{lst_splited_keys[-1]}")
+                        
+                        # 将 str_barcode 从set_reading_gr中删除
+                        # inst_redis 
+                        inst_logger.debug(f"包裹已经离开CV03,uid={str_uid},barcode={str_barcode}") 
+            
         # --------------------
         time.sleep(__prc_cycletime / 1000.0)  # 所有时间均以ms形式存储
 

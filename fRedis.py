@@ -60,11 +60,27 @@ class clsRedis:
                 return value
         else:
             raise Exception("Redis尚未建立连接")
-
-    def incrkey(self, key):
+    
+    def keys(self, prefix):
+        # 查询key-value 键对值
+        if self.__isconnected__:
+            value = self.decoded_connection.scan(match=f"{prefix}*",count = 100)
+            if value[1] is None:
+                # ToDo 后续为redis建立私有logger，查询到空键对值时logger.debug
+                return None
+            else:
+                result = value[1].copy()
+                while not int(value[0]) == 0:
+                    value=self.decoded_connection.scan(cousor=value[0],match=f"{prefix}*",count = 100)
+                    result.append(vaule[1].copy())
+                return result
+        else:
+            raise Exception("Redis尚未建立连接")
+    
+    def incrkey(self, key , incrby = 1):
         # 增加键对值，并返回结果
         if self.__isconnected__:
-            value = self.decoded_connection.incr(f"{key}")
+            value = self.decoded_connection.incrby(f"{key}",incrby)
             return int(value)
         else:
             raise Exception("Redis尚未建立连接")
