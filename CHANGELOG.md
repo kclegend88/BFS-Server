@@ -55,3 +55,16 @@ update HIKC network thread, add unpack recv buf funtion
 add main_cli, prc_cli_manualscan, get input barcode, re function check barcode, add ms code into stm_ms 
 
 add stm manualscan, read from stm_ms and add to set.
+
+# Rev 0.2.7
+Update redis, add keys function
+Update cli_ms, get reading_gr/reading_mr,if read check ok, insert into stream ms
+Fixed HIKC heart interval bug, when recv msg , no heartbeat send out
+Update plc, calc parcel position,when leave CV03, insert into stream reading confirm
+ 
+# Rev 0.2.8
+Update fRedis, add clearset function
+Update fPLC, add autostart config and autostart function,add autostop function,fix bug from slow to highspeed continue output
+Update stmManualScan, compare set_reading_nr/mr and set_ms_nr/mr, if ok move all code to set_reading_gr and speed up conv,success
+try sys.exit(code), and catch exception in main()
+

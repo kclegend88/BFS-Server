@@ -100,14 +100,14 @@ def start_process(config_file):
         
         if strManualScanBarcode in lst_reading_mr:      
             print("Get MRead Barcode !!")
-            inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode.'type':'MR'})      # 插入 Manual Scan stream/MR
+            inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode,'type':'MR'})      # 插入 Manual Scan stream/MR
             continue
         
         # 条码格式校验
         bBarcodeValid = False
         for i, re_exp in enumerate(lst_re_exp):
             if barcode_formatcheck(strManualScanBarcode,re_exp):
-                inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode.'type':'NR'})      # 插入 Manual Scan stream/NR
+                inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode,'type':'NR'})      # 插入 Manual Scan stream/NR
                 print("Barcode valid,insert into system")
                 bBarcodeValid = True
                 break

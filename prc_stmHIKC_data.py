@@ -98,23 +98,24 @@ def start_process(config_file):
                 elif dictdata['result']=='MR':                                          # 多条码
                     inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'MR')         # uid对应的包裹，扫描结果 MR
                     inst_redis.setkey(f"parcel:barcode:{dictdata['uid']}",dictdata['code']) # uid对应的包裹，多条码读取出来的条码 
+                    inst_redis.setkey(f"parcel:ms_barcode:{dictdata['code']}",dictdata['uid'])  # 多条码读取出来的条码，对应的uid 
                     inst_redis.sadd("set_reading_mr", dictdata['code'])                     # MR的包裹，将条码加入set_reading_mr
 
                     # Only for debug
-                    inst_logger.debug("读取结果 %s, 条码 %s, " %(dictdata['result'],dictdata['code']))        
+                    inst_logger.debug("----读取异常！ %s, 条码 %s, " %(dictdata['result'],dictdata['code']))        
                     # Only for debug
 
-                    # inst_redis.setkeypx(f"plc_conv:fullspeed","countdown",15000)            # slow down conv
+                    inst_redis.setkeypx(f"plc_conv:fullspeed","countdown",15000)            # slow down conv
                     
                 elif dictdata['result']=='NR':      # 无条码    
                     inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'NR')     # uid对应的包裹，扫描结果 NR
                     inst_redis.sadd("set_reading_nr", dictdata['uid'])                  # NR的包裹，无条码，将uid加入set_reading_nr
 
                     # Only for debug
-                    inst_logger.debug("读取结果 %s, 条码 xxxxxxx, " %(dictdata['result'],))        
+                    inst_logger.debug("----读取异常！ %s, 条码 xxxxxxx, " %(dictdata['result'],))        
                     # Only for debug
 
-                    # inst_redis.setkeypx(f"plc_conv:fullspeed","countdown",15000)        # slow down conv
+                    inst_redis.setkeypx(f"plc_conv:fullspeed","countdown",15000)        # slow down conv
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         

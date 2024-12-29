@@ -66,8 +66,12 @@ def start_process(config_file):
     b_thread_running = True
     int_exit_code = 0
     
-    dictdata=[]
-    lstdictdata={}
+    dictdata={}
+    lstdictdata=[]
+    set_reading_mr={}
+    lst_reading_nr=[]
+    set_ms_mr={}
+    lst_ms_nr=[]
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
@@ -81,7 +85,60 @@ def start_process(config_file):
             inst_logger.info("收到补码扫描序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
             for i,v in l[0][1]:             # 遍历收到的所有消息
                 dictdata = v                                            # redis decoding返回的是dict格式
-                inst_redis.sadd("set_manualscan", dictdata['code'])     # 将条码加入set_manualscan
+                inst_redis.sadd("set_ms", dictdata['barcode'])     # 将条码加入set_manualscan
+                # 将条码发送给barcode check 模块
+                # 如果返回的是ok，那么仅仅进行扫描补码，补码条件满足就恢复输送机运行
+                if dictdata['barcode'] == 'MR':
+                    inst_redis.sadd("set_ms_mr", dictdata['barcode'])     
+                else:
+                    inst_redis.sadd("set_ms_nr", dictdata['barcode'])     
+                # 如果返回的是各类异常 BL/OP/NF/SF/RC,那么需要反馈barcode check 异常，要求客户端执行剔除操作
+        
+
+        lst_reading_nr = list(inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
+        lst_ms_nr = list(inst_redis.getset("set_ms_nr"))            # 更新set_ms_nr       
+        set_reading_mr = inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
+        set_ms_mr = inst_redis.getset("set_ms_mr")            # 更新set_ms_mr
+
+        if len(lst_reading_nr) + len(set_reading_mr) == 0:
+            continue
+        # 开始逻辑判断
+        # set_ms_nr 的数量，与set_reading_nr的数量一致
+        if not len(lst_ms_nr)== len(lst_reading_nr):
+            continue
+        # set_ms_mr 的 set_reading_mr 完全一致
+        if not set_ms_mr == set_reading_mr:
+            continue
+        # 所有check_ng的包裹都已经被捕捉
+        # 将nr\mr中的所有包裹，从set_reading mr/nr中删除，移动到set_reading_gr中，parcel:status更改成为mr_ms或者nr_ms
+        # 恢复输送机速度
+        for i,parcel_uid in enumerate(lst_reading_nr):
+            inst_redis.setkey(f"parcel:scan_result:{parcel_uid}","NR_MS")
+            inst_redis.setkey(f"parcel:barcode:{parcel_uid}",lst_ms_nr[i])
+            inst_logger.info("包裹补码成功,线程 %s 修改NR包裹状态 uid= %s, barcode =%s"%(__prc_name__,parcel_uid,lst_ms_nr[i]))
+        inst_redis.clearset("set_ms_nr")
+        inst_redis.clearset("set_reading_nr")
+            
+        for parcel_barcode in set_reading_mr:
+            parcel_uid = inst_redis.getkey(f"parcel:ms_barcode:{parcel_barcode}")
+            inst_redis.setkey(f"parcel:scan_result:{parcel_uid}","MR_MS")
+            inst_redis.setkey(f"parcel:barcode:{parcel_uid}",parcel_barcode)
+            inst_logger.info("包裹补码成功,线程 %s 修改MR包裹状态 uid= %s, barcode =%s"%(__prc_name__,parcel_uid,parcel_barcode))
+        inst_redis.clearset("set_ms_mr")       
+        inst_redis.clearset("set_reading_mr")
+
+        plc_conv_status = inst_redis.getkey("plc_conv:status")
+        plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
+        if plc_conv_status == 'run':
+            if plc_conv_fullspeed == 'countdown':
+                inst_redis.setkey("plc_conv:fullspeed",'Yes')       # 如果在运转，则plc_conv_fullspeed 应为countdown 15秒，更改fullspeed=yes即可恢复
+                inst_logger.info("包裹补码成功，线程 %s 尝试将输送机恢复至正常速度" %(__prc_name__,))
+            else:
+                inst_logger.error("线程 %s 在恢复输送机速度时发现状态异常" %(__prc_name__,))
+                continue
+        else:
+            inst_redis.setkey("plc_conv:command",'start')       # 如果不在运转，则说明已停机，需重新启动
+            inst_logger.info("包裹补码成功，线程 %s 尝试重新启动输送机" %(__prc_name__,))
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         

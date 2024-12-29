@@ -30,6 +30,7 @@ def start_process(config_file):
                     inst_logger.error("线程 %s 连接相机失败，取得异常信息时发生错误"%(__prc_name__,))
         except Exception as e:                  # 发生未预料的错误
             inst_logger.error("线程 %s 尝试连接时发生错误,发生未预料的错误: %s"%(__prc_name__,e))
+
     
     def prc_HC_recvData():
         # 处理接收到的数据

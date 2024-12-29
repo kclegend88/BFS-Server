@@ -3,6 +3,7 @@ import json
 import time
 import traceback
 import threading
+import sys
 # import redis
 from fLog import clsLogger
 from fConfig import clsConfig
@@ -13,6 +14,7 @@ from fRedis import clsRedis
 from prc_HIKCamera import start_process as start_HIKCamera
 from prc_PLC import start_process as start_PLC
 from prc_stmHIKC_data import start_process as start_stmHIKC_data
+from prc_stmManualScan import start_process as start_stmManualScan
 
 class main:
     def __init__(self):
@@ -20,7 +22,7 @@ class main:
         __version__='0.1.0'
         
         # 定义线程总表，所有在该表格中的线程由main启动并监控
-        self.lst_thread_name = ["HIKCamera","stmHIKC_data","PLC"]
+        self.lst_thread_name = ["HIKCamera","stmHIKC_data","PLC","stmManualScan"]
         
 
     def run(self):
@@ -37,7 +39,7 @@ class main:
         except:
             inst_logger.error("配置读取失败"+traceback.format_exc())
             input("从ini文件中读取配置信息失败,请按任意键....")
-            exit()
+            sys.exit(127)               # 无配置文件退出
         inst_logger.info("配置与日志初始化成功")
 
         # 尝试连接Redis
@@ -48,35 +50,31 @@ class main:
             if main_prc_running == "true":
                 # 其他main线程正在运行中，强制退出
                 inst_logger.error("已有程序运行中，本程序将退出！！！")
-                exit()
+                sys.exit(126)           # 有实例运行导致退出
 
             inst_logger.info("Redis 连接成功")
             
-            inst_redis.flushall()
-            inst_logger.info("Redis 数据清理成功")
-            inst_redis.setkey(f"sys:ready", "true")
+            inst_redis.flushall()                   # 清理全部数据
+            inst_logger.info("Redis 数据清理成功")     
             
-        except:
+        except Exception as e:
             inst_logger.error("Redis连接失败"+traceback.format_exc())
-            exit()
+            sys.exit(125)               # Redis 连接失败，或数据初始化失败
         
+        inst_redis.setkey(f"sys:ready", "true") # 向Redis标注主程序已运行        
         # 尝试启动线程
-        # str_thread_name=''
         try:
-            # 遍历线程总表 逐个启动现场
+            # 遍历线程总表 逐个启动线程
             for i,str_prc_name in enumerate(self.lst_thread_name):
-                # 每个线程的start_process 需在import中 定义为start_ + 线程名称
-                str_thread_name = "start_%s" %(str_prc_name,)
-                inst_logger.info("主程序尝试启动线程: %s" %(str_thread_name,))
-                # 通过globlas().get 取得指定名称的入口句柄 返回给Thread作为线程启动入口
+                str_thread_name = "start_%s" %(str_prc_name,)               # 每个线程的start_process 需在import中 定义为start_ + 线程名称
+                inst_logger.info("主程序尝试启动线程: %s" %(str_thread_name,)) # 通过globlas().get 取得指定名称的入口句柄 返回给Thread作为线程启动入口
                 thread = threading.Thread(target=globals().get(str_thread_name), args=(ini_config,),name=str_prc_name)
                 thread.start()
                 time.sleep(1)
-
             inst_logger.info("主程序已尝试启动全部线程，共计 %d 个" % (len(self.lst_thread_name),))
-        except:
+        except Exception as e:
             inst_logger.error ("线程启动失败"+traceback.format_exc())
-            exit()
+            sys.exit(124)               # 启动线程时发生异常
         
         # 退出时应清理主线程运行标志
         # inst_redis.setkey(f"sys:ready", "false")
@@ -113,4 +111,15 @@ class main:
                 
 if __name__ == '__main__':
     app = main()
-    app.run()
+    try:
+        app.run()
+    except SystemExit as msg:
+        print(traceback.format_exc())
+        int_exit_code =int(str(msg))
+        if int(str(msg)) <126:
+            inst_redis.clearkey(f"sys:ready", "true") # 清理标志   
+    except Exception as e:
+        print("其他异常")
+        print(e)
+            
+

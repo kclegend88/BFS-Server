@@ -243,7 +243,14 @@ class clsRedis:
             raise Exception("Redis尚未建立连接")    
 
 
-
+    def clearset(self, key):
+       # 清除键对
+        if self.__isconnected__:
+            self.decoded_connection.delete(f"{key}")
+            return
+        else:
+            raise Exception("Redis尚未建立连接")
+            
     def clearkey(self, key):
        # 清除键对
         if self.__isconnected__:
