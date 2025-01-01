@@ -31,6 +31,13 @@ def start_process(config_file):
     __plc_ip__ = __ini_prc_config__.Sever.PLC_server_ip
     __plc_db_size = __ini_prc_config__.plc_info.DB3_size
 
+    # 读取ini中 ini_speed_H， ini_speed_L， ini_conv_length
+    __ini_speed_H = __ini_prc_config__.plc_info.ini_speed_H
+    __ini_speed_L = __ini_prc_config__.plc_info.ini_speed_L
+    __ini_conv_length = __ini_prc_config__.plc_info.ini_conv_length
+    
+    __ini_start_conv = __ini_prc_config__.Config.StartConv
+
     # 连接PLC
     inst_logger.info(f"线程{__prc_name__}尝试连接 PLC")
     PLC_connect(inst_logger, __inst_plc__, __plc_ip__)
@@ -63,9 +70,9 @@ def start_process(config_file):
         inst_logger.info("线程 %s 已添加至线程集合中" % (__prc_name__,))
 
         # command，status，cv1-cv4变量初始化
-        inst_redis.setkey("plc_conv:command", "stop")
+        # inst_redis.setkey("plc_conv:command", "stop")
         inst_redis.setkey(f"plc_conv:status", "pause")
-        inst_redis.setkey(f"plc_conv:fullspeed", "Yes")
+        # inst_redis.setkey(f"plc_conv:fullspeed", "Yes")
         inst_redis.setkey(f"plc_conv:CV01:speed", "stop")
         inst_redis.setkey(f"plc_conv:CV02:speed", "stop")
         inst_redis.setkey(f"plc_conv:CV03:speed", "stop")
@@ -81,6 +88,12 @@ def start_process(config_file):
 
     b_thread_running = True
     int_exit_code = 0
+    is_locked = False
+    
+    lst_parcel_keys =[]
+    dict_reading_con = {}
+    if __ini_start_conv:
+        inst_redis.setkey("plc_conv:command","start")
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock", __prc_id__, __prc_expiretime)
@@ -90,52 +103,117 @@ def start_process(config_file):
         plc_conv_command = inst_redis.getkey("plc_conv:command")
         plc_conv_status = inst_redis.getkey("plc_conv:status")
         plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
-        if plc_conv_command == "start" and plc_conv_status == "pause":
-            # 启动所有皮带机 0 停止 1低速 2 低中速 3 4 修改redis中状态为高速
+        current_time = datetime.datetime.now().isoformat()
+        # 启动
+        if plc_conv_command == "start":
+            is_locked = False
             for i in range(1, 5):
                 __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([3]))
             inst_redis.setkey("plc_conv:status", "run")
+            inst_redis.setkey(f"plc_conv:fullspeed", "Yes")
             for i in range(1, 5):
                 inst_redis.setkey(f"plc_conv:CV0{i}:speed", "high")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: start")
             inst_logger.info("线程 %s 皮带机启动，速度为高速" % (__prc_name__,))
-        if plc_conv_command == "start" and plc_conv_status == "run":
-            if plc_conv_fullspeed != "None":
-                status = 0
-                # 如果cv1-cv4 速度不为高速   则启动皮带机应为高速   降速状态到高速状态
-                for i in range(1, 5):
-                    if inst_redis.getkey(f"plc_conv:CV0{i}:speed") != 'high':
-                        status = 1
-                if status == 1:
-                    for i in range(1, 5):
-                        __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([3]))
-                        inst_redis.setkey(f"plc_conv:CV0{i}:speed", "high")
-                    inst_logger.info("线程 %s 已从低速变为高速" % (__prc_name__,))
-            else:
-                status = 0
-                # 如果cv1-cv4 速度不为低速   则启动皮带机应为低速   高速状态变为低速状态
-                if inst_redis.getkey(f"plc_conv:CV01:speed") == 'high' \
-                        and inst_redis.getkey(f"plc_conv:CV02:speed") == 'high' \
-                        and inst_redis.getkey(f"plc_conv:CV03:speed") == 'high' \
-                        and inst_redis.getkey(f"plc_conv:CV04:speed") == 'high':
-                    status = 1
-                if status == 1:
-                    inst_redis.setkey(f"plc_conv:CV01:speed", "stop")
-                    inst_redis.setkey(f"plc_conv:CV02:speed", "low")
-                    inst_redis.setkey(f"plc_conv:CV03:speed", "low")
-                    inst_redis.setkey(f"plc_conv:CV04:speed", "high")
-                    __inst_plc__.db_write(12, 3, bytearray([0]))
-                    __inst_plc__.db_write(12, 7, bytearray([1]))
-                    __inst_plc__.db_write(12, 11, bytearray([1]))
-                    __inst_plc__.db_write(12, 15, bytearray([3]))
-                    inst_logger.info("线程 %s 已从高速变为低速" % (__prc_name__,))
-        if plc_conv_command == "stop" and plc_conv_status == "pause":
-            pass
-        if plc_conv_command == "stop" and plc_conv_status == "run":  # 正在运行，需要停线
+            inst_redis.clearkey('plc_conv:command')
+        # 停止
+        if plc_conv_command == "stop":
+            is_locked = False
             for i in range(1, 5):
                 __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([0]))
-                inst_redis.setkey(f"plc_conv:CV0{i}:speed", "stop")
             inst_redis.setkey("plc_conv:status", "pause")
-            inst_logger.info("线程 %s 皮带已停线" % (__prc_name__,))
+            for i in range(1, 5):
+                inst_redis.setkey(f"plc_conv:CV0{i}:speed", "stop")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: stop")
+            inst_logger.info("线程 %s 皮带机停止，速度为0" % (__prc_name__,))
+            inst_redis.clearkey('plc_conv:fullspeed')
+            inst_redis.clearkey('plc_conv:command')
+        # 高速到减速
+        if plc_conv_status == 'run' and plc_conv_fullspeed == 'countdown' and is_locked is False:
+            is_locked = True
+            inst_redis.setkey(f"plc_conv:CV01:speed", "stop")
+            inst_redis.setkey(f"plc_conv:CV02:speed", "low")
+            inst_redis.setkey(f"plc_conv:CV03:speed", "low")
+            inst_redis.setkey(f"plc_conv:CV04:speed", "high")
+            __inst_plc__.db_write(12, 3, bytearray([0]))
+            __inst_plc__.db_write(12, 7, bytearray([1]))
+            __inst_plc__.db_write(12, 11, bytearray([1]))
+            __inst_plc__.db_write(12, 15, bytearray([3]))
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down")
+            inst_logger.info("线程 %s 皮带机减速，速度为降速" % (__prc_name__,))
+
+        # 减速到高速
+        if plc_conv_status == 'run' and plc_conv_fullspeed == 'Yes' and is_locked is True:
+            is_locked = False
+            for i in range(1, 5):
+                __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([3]))
+            for i in range(1, 5):
+                inst_redis.setkey(f"plc_conv:CV0{i}:speed", "high")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down ——》 high")
+            inst_logger.info("线程 %s 皮带机从减速变为高速，速度为高速" % (__prc_name__,))
+            inst_redis.setkey(f"plc_conv:fullspeed", "Yes")
+        # 减速变成停止
+        if plc_conv_status == 'run' and plc_conv_fullspeed is None:
+            is_locked = False
+            inst_redis.setkey(f"plc_conv:CV01:speed", "stop")
+            inst_redis.setkey(f"plc_conv:CV02:speed", "stop")
+            inst_redis.setkey(f"plc_conv:CV03:speed", "stop")
+            inst_redis.setkey(f"plc_conv:CV04:speed", "high")
+            __inst_plc__.db_write(12, 3, bytearray([0]))
+            __inst_plc__.db_write(12, 7, bytearray([0]))
+            __inst_plc__.db_write(12, 11, bytearray([0]))
+            __inst_plc__.db_write(12, 15, bytearray([3]))
+            inst_redis.setkey("plc_conv:status", "pause")
+            # inst_redis.lpush("stm_sys_log", f"[{current_time}]-<conv>: slow down stop")
+            inst_logger.info("线程 %s 皮带机从异常到停止，速度为0" % (__prc_name__,))
+        # 计算每个包裹X位置 此段代码后续需要移动至专门的文件中，否则一旦出错就会与PLC断联
+        plc_conv_status = inst_redis.getkey("plc_conv:status")
+        if plc_conv_status == 'run':
+            plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
+            if plc_conv_fullspeed == 'Yes':
+                speed_x = __ini_speed_H
+            elif plc_conv_fullspeed == 'countdown':
+                speed_x = __ini_speed_L
+            else:
+                speed_x = 0
+            # 遍历所有包裹 所有包裹加上speed_x 加上后判断是否超过上限
+            lst_parcel_keys=inst_redis.keys('parcel:posx:')
+#            for i,key in enumerate(lst_parcel_keys):
+            for i,key in enumerate(lst_parcel_keys):
+                inst_redis.incrkey(f"{key}", incrby = speed_x)
+                if int(inst_redis.getkey(f"{key}")) > __ini_conv_length:
+                    lst_splited_keys = key.split(':')
+                    str_uid = lst_splited_keys[-1]
+                    str_result = inst_redis.getkey(f"parcel:scan_result:{str_uid}")
+                    str_barcode = inst_redis.getkey(f"parcel:barcode:{str_uid}")
+                    
+                    if not str_result in ['GR','MR_MS','NR_MS']:
+                        # 有异常包裹流出
+                        inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}") 
+                        # 发送停线指令
+                        inst_redis.setkey(f"plc_conv:command", "stop")
+                    else:
+                        dict_reading_con['uid'] = str_uid
+                        dict_reading_con['ts'] = datetime.datetime.now().isoformat()
+                        dict_reading_con['barcode'] = str_barcode
+                        dict_reading_con['scan_result'] = str_result
+                        # dict_reading_con['check_result'] = inst_redis.getkey(f"parcel:check_result:{str_uid}")
+                        # dict_reading_con['remark'] = inst_redis.getkey(f"parcel:remark:{str_uid}")                   
+                        
+                        inst_redis.xadd( "stream_reading_confirm", dict_reading_con)      # 插入stream
+                        
+                        # 清理redis中CV03上的包裹信息
+                        inst_redis.clearkey(f"{key}")
+                        inst_redis.clearkey(f"parcel:posy:{str_uid}")
+                        inst_redis.clearkey(f"parcel:sid:{str_uid}")
+                        inst_redis.clearkey(f"parcel:scan_result:{str_uid}")
+                        inst_redis.clearkey(f"parcel:barcode:{str_uid}")
+                        
+                        # 将 str_barcode 从set_reading_gr中删除
+                        # 此处需要深入考虑一下，如果单次扫描可以使用gr来剔除重复扫描，那么可以考虑暂时不删除，等到切换MAWB在清理
+                        # inst_redis 
+                        inst_logger.debug(f"包裹已经离开CV03,uid={str_uid},barcode={str_barcode}") 
+            
         # --------------------
         time.sleep(__prc_cycletime / 1000.0)  # 所有时间均以ms形式存储
 
@@ -161,6 +239,8 @@ def start_process(config_file):
         prc_run_lock = inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
         if prc_run_lock is None:
             int_exit_code = 1
+            for i in range(1, 5):
+                __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([0]))
             break
 
         # 如command区收到退出命令，根据线程类型决定是否立即退出
@@ -169,6 +249,8 @@ def start_process(config_file):
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
             int_exit_code = 2
+            for i in range(1, 5):
+                __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([0]))
             break
 
     inst_logger.info("线程 %s 已退出，返回代码为 %d" % (__prc_name__, int_exit_code))
@@ -176,10 +258,14 @@ def start_process(config_file):
 
 def PLC_connect(inst_logger, __inst_plc__, __plc_ip__):
     while True:
-        __inst_plc__.connect(__plc_ip__, 0, 1)  # 连接到PLC
-        if __inst_plc__.get_connected():
-            inst_logger.error("线程 PLC PLC连接成功。")
-            break
-        else:
+        try:
+            __inst_plc__.connect(__plc_ip__, 0, 1)  # 连接到PLC
+            if __inst_plc__.get_connected():
+                inst_logger.error("线程 PLC PLC连接成功。")
+                break
+            else:
+                inst_logger.error("线程 PLC PLC连接失败，三秒后重连")
+            time.sleep(3)
+        except Exception as e:
             inst_logger.error("线程 PLC PLC连接失败，三秒后重连")
-        time.sleep(3)
+            time.sleep(3)

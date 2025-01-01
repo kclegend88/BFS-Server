@@ -5,9 +5,11 @@ from fLog import clsLogger
 from fConfig import clsConfig
 from fConfigEx import clsConfigEx
 from fRedis import clsRedis
+import ast
+import sqlite3
 
 def start_process(config_file):
-    __prc_name__="xxxx"
+    __prc_name__="stmReadingConfirm"
     
     ini_config = clsConfig(config_file)   # 来自主线程的配置文件
     inst_logger = clsLogger(ini_config)  
@@ -57,15 +59,52 @@ def start_process(config_file):
         inst_logger.error("线程 %s 启动时发现了运行冲突,同名线程已存在,id= %d"%(__prc_name__,prc_run_lock))
         exit()
     
+    if not inst_redis.xcreategroup("stream_reading_confirm", "ReadingConfirm"):
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("ReadingConfirm",))
+    else:
+        inst_logger.info("线程 %s 注册stream组成功" %("ReadingConfirm",))
+    
     b_thread_running = True
     int_exit_code = 0
+    
+    dictdata=[]
+    lstdictdata={}
+    conn = sqlite3.connect("stm_record.db")
+    cursor = conn.cursor()
+    # 创建订单表格
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS order_info (
+            UID INTEGER PRIMARY KEY AUTOINCREMENT,  -- 编号
+            OSN TEXT NOT NULL,  
+            TS TEXT,
+            SR TEXT,
+            TEST_ID TEXT
+        )
+    """)    
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
-        
+
         # --------------------
         # 主线程操作区
-        
+        l = inst_redis.xreadgroup("stream_reading_confirm","ReadingConfirm","ReadingConfirm-DB01")
+
+        if len(l)>0 :                       # 收到消息
+            # print(l)                        # Only for debug
+            inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
+            for i,dictdata in l[0][1]:             # 遍历收到的所有消息
+                try:
+                    cursor.execute('INSERT INTO order_info (OSN,TS,SR,TEST_ID) VALUES (?,?,?,?)',
+                           (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))
+                    # Only for debug
+                    inst_logger.debug("SQLite DB 写入成功,条码 %s,时间戳 %s,扫描结果 %s, 扫描ID %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))        
+                    # Only for debug
+                except sqlite3.IntegrityError:
+                    inst_logger.debug("SQLite DB 写入失败！！,条码 %s,时间戳 %s,扫描结果 %s, 扫描ID %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))  
+                
+                finally:
+                    conn.commit()
+                
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
@@ -99,9 +138,9 @@ def start_process(config_file):
         if prc_run_lock == "exit":
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
-            int_exit_code = 2           
+            int_exit_code = 2          
             break
-    
+    conn.close()
     inst_logger.info("线程 %s 已退出，返回代码为 %d" %(__prc_name__,int_exit_code))
 
 

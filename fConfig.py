@@ -56,5 +56,3 @@ class clsConfig:
             setattr(self, section_name, SectionConfig(self.config[section_name]))
 
         # 界面显示：读取xx\xx\xxx\config.ini成功，
-
-

@@ -63,19 +63,19 @@ class clsLogger:
             print("发生错误", e)
 
     def debug(self,  message):
-        self.logger.debug(f"{message}")
+        self.logger.debug(f"{message}",stacklevel=2)
         return True
 
     def info(self,  message):
-        self.logger.info(f"{message}")
+        self.logger.info(f"{message}",stacklevel=2)
         return True
 
     def warning(self,  message):
-        self.logger.warning(f"{message}")
+        self.logger.warning(f"{message}",stacklevel=2)
         return True
 
     def error(self,  message):
-        self.logger.error(f"{message}")
+        self.logger.error(f"{message}",stacklevel=2)
         return True
 
     def get_logger(self):

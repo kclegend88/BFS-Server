@@ -32,12 +32,12 @@ class SectionConfigEx:
 
 class clsConfigEx:
     
-    def __new__(cls, *args, **kwargs):
-        cls._instance = super(clsConfigEx, cls).__new__(cls)
-        cls._instance.init(*args, **kwargs)
-        return cls._instance
+    #def __new__(cls, *args, **kwargs):
+    #    cls._instance = super(clsConfigEx, cls).__new__(cls)
+    #    cls._instance.init(*args, **kwargs)
+    #    return cls._instance
         
-    def init(self, config_file):
+    def __init__(self, config_file):
         self.config = configparser.ConfigParser()
         self.config_file = config_file
         self.read(self.config_file)

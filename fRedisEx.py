@@ -7,13 +7,15 @@ from fConfig import clsConfig
 class clsRedis:
     _instance = None
 
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super(clsRedis, cls).__new__(cls)
-            cls._instance.init(*args, **kwargs)
-        return cls._instance
+#    def __new__(cls, *args, **kwargs):
+#        if cls._instance is None:
+#            cls._instance = super(clsRedis, cls).__new__(cls)
+#            cls._instance.init(*args, **kwargs)
+#        return cls._instance
 
-    def init(self, config_file):
+#    def init(self, config_file):
+    def __init__(self, config_file):
+        self.__isconnected__ = False
         self.ini_config = clsConfig(config_file)
 
     def connect(self, config_file):
@@ -28,7 +30,6 @@ class clsRedis:
         # ToDo 当前未使用配置文件中的IP与端口，也未处理配置文件中上述信息缺失可能导致的异常退出
         # ToDo 当Redis连接出现异常时，Redis是否自动重新连接尚未有结论，重连机制是否需要主线程参与需要详细测试后得出结论
         self.decoded_connection = redis.Redis(decode_responses=True)
-        print(self.decoded_connection)
         if self.decoded_connection.ping():
             self.__isconnected__ = True
             return
@@ -60,27 +61,11 @@ class clsRedis:
                 return value
         else:
             raise Exception("Redis尚未建立连接")
-    
-    def keys(self, prefix):
-        # 查询key-value 键对值
-        if self.__isconnected__:
-            value = self.decoded_connection.scan(match=f"{prefix}*",count = 100)
-            if value[1] is None:
-                # ToDo 后续为redis建立私有logger，查询到空键对值时logger.debug
-                return None
-            else:
-                result = value[1].copy()
-                while not int(value[0]) == 0:
-                    value=self.decoded_connection.scan(cousor=value[0],match=f"{prefix}*",count = 100)
-                    result.append(vaule[1].copy())
-                return result
-        else:
-            raise Exception("Redis尚未建立连接")
-    
-    def incrkey(self, key , incrby = 1):
+
+    def incrkey(self, key):
         # 增加键对值，并返回结果
         if self.__isconnected__:
-            value = self.decoded_connection.incrby(f"{key}",incrby)
+            value = self.decoded_connection.incr(f"{key}")
             return int(value)
         else:
             raise Exception("Redis尚未建立连接")
@@ -221,7 +206,7 @@ class clsRedis:
     def xcreategroup(self, sname, gname):
         # 为每个线程创建一个组
         if self.__isconnected__:
-            self.decoded_connection.xgroup_create (sname,gname, id=0, mkstream=True)
+            self.decoded_connection.xgroup_create (sname,gname, id=0)
             return 
         else:
             raise Exception("Redis尚未建立连接")         
@@ -243,14 +228,7 @@ class clsRedis:
             raise Exception("Redis尚未建立连接")    
 
 
-    def clearset(self, key):
-       # 清除键对
-        if self.__isconnected__:
-            self.decoded_connection.delete(f"{key}")
-            return
-        else:
-            raise Exception("Redis尚未建立连接")
-            
+
     def clearkey(self, key):
        # 清除键对
         if self.__isconnected__:
