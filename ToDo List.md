@@ -25,6 +25,10 @@
 
 ### Just ToDo
 
+- [ ] fRedis setkey, after upgrade to Redis 6.2, before set value to buf, compare return value of set redis old data( set(key, get=true) ), to avoid async of the buf and redis
+
+- [ ] main.py startup, after start all thread, count how many runlock online, compare to thread counter to figure out, the startup proceed is doing well or not . 
+
 - [ ] cli_template, entrance with cli_id, independent redis connection
 
 - [ ] Test: when start main_cli.py  twice, how many logger instance? independent or unique ?

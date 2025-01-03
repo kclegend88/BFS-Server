@@ -7,7 +7,6 @@ import os
 class SectionConfig:
     def __init__(self, section):
         self._section = section
-
     def __getattr__(self, name):
         if name in self._section:
             value = self._section[name]
@@ -17,7 +16,6 @@ class SectionConfig:
                 return value  # 返回原始字符串值
         else:
             raise AttributeError(f"没有这样的属性: {name}")
-
     def __getitem__(self, name):
         if name in self._section:
             value = self._section[name]
@@ -28,22 +26,17 @@ class SectionConfig:
         else:
             raise KeyError(f"没有这样的键: {name}")
 
-
-
 class clsConfig:
     _instance = None
-
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(clsConfig, cls).__new__(cls)
             cls._instance.init(*args, **kwargs)
         return cls._instance
-
     def init(self, config_file):
         self.config = configparser.ConfigParser()
         self.config_file = config_file
         self.read(self.config_file)
-
     def read(self, config_file):
         if not os.path.exists(config_file):
             raise FileNotFoundError
