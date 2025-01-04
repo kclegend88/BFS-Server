@@ -158,7 +158,7 @@ class clsRedis:
         return
     def keysbuf(self,prefix):
         lst_result=[]
-        for i, key in enumerate(dictKeyBuffer):
+        for i, key in enumerate(self.dictKeyBuffer):
             if key.startswith(prefix):
                 lst_result.append(key)
         if lst_result:

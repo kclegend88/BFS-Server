@@ -14,6 +14,8 @@
 
 - [ ] plc connection fault -- alarm and stop
 
+- [ ] client id and group id conflict
+
 ### Urgent
 
 - [ ] PLC Comm process, read-write, record trigger-->stm

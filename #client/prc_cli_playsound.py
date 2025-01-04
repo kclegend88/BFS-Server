@@ -1,4 +1,6 @@
 # prc_template  v 0.2.0
+import sys
+sys.path.append("..")
 import time
 import datetime
 import pygame
@@ -8,6 +10,7 @@ from fConfig import clsConfig
 from fConfigEx import clsConfigEx
 from fRedis import clsRedis
 from pygame import mixer
+
 
 def start_process(config_file,__cli_id__):
     __prc_cli_type__=f"cli_playsound"
@@ -97,11 +100,11 @@ def start_process(config_file,__cli_id__):
                         mixer.music.load(dict_sound['reading_nr'])
                         mixer.music.play()                        
         else:                                                       # 补码状态，收取HIK的读码信息，但是不播放声音，只播放补码声音
-            time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
+            pass
             
 
         # --------------------
-        # time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
+        time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
         # 线程运行时间与健康程度判断
                 
@@ -114,7 +117,7 @@ def start_process(config_file,__cli_id__):
                
         inst_redis.lpush(f"lst_ct:%s"%(__prc_name__,),int_last_ct_ms) # 将最新的ct插入redis中的lst_ct
         int_len_lst= inst_redis.llen(f"lst_ct:%s"%(__prc_name__,))  # 取得列表中元素的个数
-        if int_len_lst > 10:
+        if int_len_lst > 100:
             inst_redis.rpop(f"lst_ct:%s"%(__prc_name__,))    # 尾部数据弹出
         # cycletime 计算 与 healthy判断
         # ToDo 

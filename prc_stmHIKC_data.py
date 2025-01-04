@@ -14,7 +14,7 @@ from fHIKCamera import clsHIKCameraClient
 
 def start_process(config_file):
     
-    def prc_stmhikc_dataproc(self,lstdata):
+    def prc_stmhikc_dataproc(lstdata):
         nonlocal inst_logger,__prc_name__
         for i,dictdata in lstdata:             # 遍历收到的所有消息
             inst_redis.setkey(f"parcel:sid:{dictdata['uid']}",i)   # uid对应的Stream id
@@ -39,8 +39,8 @@ def start_process(config_file):
                 inst_logger.debug("----读取异常！ %s, 条码 %s, " %(dictdata['result'],dictdata['code']))        
                 # Only for debug
                 plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
-                if plc_conv_fullspeed=="Yes":
-                    inst_redis.setkeypx(f"plc_conv:fullspeed","countdown",15000)     # count down 15s
+                if plc_conv_fullspeed=="yes":
+                    inst_logger.info("发送减速信号autoslowdown，条码读取异常，MR")                      
                     inst_redis.setkey(f"plc_conv:command","autoslowdown")            # slow down conv
                     
             elif dictdata['result']=='NR':      # 无条码    
@@ -50,8 +50,8 @@ def start_process(config_file):
                 inst_logger.debug("----读取异常！ %s, 条码 xxxxxxx, " %(dictdata['result'],))        
                 # Only for debug
                 plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
-                if plc_conv_fullspeed=="Yes":
-                    inst_redis.setkeypx(f"plc_conv:fullspeed","countdown",15000)     # count down 15s
+                if plc_conv_fullspeed=="yes":
+                    inst_logger.info("发送减速信号autoslowdown，条码读取异常，NR")                      
                     inst_redis.setkey(f"plc_conv:command","autoslowdown")            # slow down conv
             #inst_redis.ACK("stream_test",i)
     __prc_name__="stmHIKC_data"             

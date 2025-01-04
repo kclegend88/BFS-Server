@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import sys
+sys.path.append("..")
 import json
 import time
 import traceback
@@ -45,9 +47,7 @@ class main:
         # 尝试连接Redis
         try:
             inst_redis.connect(ini_config)
-            print(inst_redis)
             main_prc_running = inst_redis.getkey(f"sys:ready")      ## 取得服务器状态，如果服务器不在线则客户端退出
-            print(main_prc_running)
             if not main_prc_running == "true":
                 # main线程尚未运行，强制退出
                 inst_logger.error("主程序尚未启动，本程序将退出！！！")
@@ -100,8 +100,6 @@ if __name__ == '__main__':
     except SystemExit as msg:
         print(traceback.format_exc())
         int_exit_code =int(str(msg))
-        if int(str(msg)) <126:
-            inst_redis.clearkey(f"sys:ready", "true") # 清理标志   
     except Exception as e:
         print("其他异常")
         print(e)

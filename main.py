@@ -25,8 +25,8 @@ class main:
         self.__version__='0.1.0'
         self.status = 127       # 初创建 状态为 127
         # 定义线程总表，所有在该表格中的线程由main启动并监控
-#        self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan","PLC"]
-        self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan"]
+        self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan","PLC"]
+#        self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan"]
         
 
     def run(self):

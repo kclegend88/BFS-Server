@@ -13,7 +13,7 @@ from fHIKCamera import clsHIKCameraClient
 
 
 def start_process(config_file):
-    def prc_stmMS_dataproc(self,lstdata):
+    def prc_stmMS_dataproc(lstdata):
         for i,dictdata in l[0][1]:             # 遍历收到的所有消息
             # inst_redis.sadd("set_ms", dictdata['barcode'])     # 将条码加入set_manualscan
             # 将条码发送给barcode check 模块
@@ -64,7 +64,6 @@ def start_process(config_file):
         plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
         if plc_conv_status == 'run':
             if plc_conv_fullspeed == 'countdown':
-                inst_redis.setkey("plc_conv:fullspeed",'yes')       # 如果在运转，则plc_conv_fullspeed 应为countdown 15秒，更改fullspeed=yes, 并给出autospeedup即可恢复
                 inst_redis.setkey("plc_conv:command",'autospeedup')
                 inst_logger.info("包裹补码成功，线程 %s 尝试将输送机恢复至正常速度" %(__prc_name__,))
             else:

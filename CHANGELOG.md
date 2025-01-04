@@ -162,3 +162,19 @@ Update fRedis,
 Update prc_template to 0.3.0
 Update HIKCamera,PLC,stmHIKC,stmMS to template 0.3.0
 Update fPLC function, reconstruct command and status,add autostart,autostop command.
+
+# Rev 0.3.1
+Add #client folder
+	client computer run client in this folder. server run client in origin folder
+Fix fRedis keysbuf bug
+Fix cli_play MR sound bug
+Update PLC, test and success, together update stmHIKC
+
+
+
+Update fRedis, 
+	add lstException, add keysbuf, return keysbuf not keys-scan 
+	add init_prc, all redis regist function inside. only need prc_name.
+Update prc_template to 0.3.0
+Update HIKCamera,PLC,stmHIKC,stmMS to template 0.3.0
+Update fPLC function, reconstruct command and status,add autostart,autostop command.
