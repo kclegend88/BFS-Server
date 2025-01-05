@@ -2,16 +2,14 @@ CHANGELOG
 
 # Rev 0.1.0
 
-Create main.ini
-Create main.py 
-
-    read ini,connect to redis
+Create main.ini  
+Create main.py  
+    read ini,connect to redis  
 
 # Rev 0.1.1
-
-Create fLog.py, fConfig.py
-    log to log\main.log,success
-    log to screen,success
+Create fLog.py, fConfig.py  
+    log to log\main.log,success  
+    log to screen,success
 
 # Rev 0.1.2
 
@@ -148,7 +146,7 @@ Create media folder
 
     using pygame play sound for manual scan ,including barcode exist, barcode not     valid, barcode valid, success 
 
-# Rev 0.2.9
+# Rev 0.2.10
 
 Create stm reading confirm
 	get order info from stream and write into SQLite3 db
@@ -156,3 +154,27 @@ Fix cli_play and HIKC usde same consumer name ready stream bug
 Fix stmHIKC bug
 	before send slow speed command, check status; if conveyor already stopped , no need send any command .
 Create ToDo List
+
+# Rev 0.3.0
+Update fRedis, 
+	add lstException, add keysbuf, return keysbuf not keys-scan 
+	add init_prc, all redis regist function inside. only need prc_name.
+Update prc_template to 0.3.0
+Update HIKCamera,PLC,stmHIKC,stmMS to template 0.3.0
+Update fPLC function, reconstruct command and status,add autostart,autostop command.
+
+# Rev 0.3.1
+Add #client folder
+	client computer run client in this folder. server run client in origin folder
+Fix fRedis keysbuf bug
+Fix cli_play MR sound bug
+Update PLC, test and success, together update stmHIKC
+
+
+
+Update fRedis, 
+	add lstException, add keysbuf, return keysbuf not keys-scan 
+	add init_prc, all redis regist function inside. only need prc_name.
+Update prc_template to 0.3.0
+Update HIKCamera,PLC,stmHIKC,stmMS to template 0.3.0
+Update fPLC function, reconstruct command and status,add autostart,autostop command.

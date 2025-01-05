@@ -1,63 +1,56 @@
 # prc_template  v 0.2.0
+import sys
+sys.path.append("..")
 import time
 import datetime
+import pygame
 from fBarcode import barcode_formatcheck
 from fLog import clsLogger
 from fConfig import clsConfig
 from fConfigEx import clsConfigEx
 from fRedis import clsRedis
+from pygame import mixer
 
-def start_process(config_file):
-    __prc_name__="cli_manualscan"
+
+def start_process(config_file,__cli_id__):
+    __prc_cli_type__=f"cli_playsound"
+    __prc_name__=f"cli%02d_playsound"%(__cli_id__,)
     
     ini_config = clsConfig(config_file)   # 来自主线程的配置文件
     inst_logger = clsLogger(ini_config)  
     inst_redis = clsRedis(ini_config)
-    inst_logger.info("线程 %s 正在启动" %(__prc_name__,))
+    inst_logger.info("线程 %s 正在启动"%(__prc_name__,))
     
     # cli 使用 Redis Ex,各自使用独立实例,每次初始化后都需要重连
     inst_redis.connect(ini_config)
-    inst_logger.info("Redis 连接成功")
+    inst_logger.info("线程 %s Redis 连接成功"%(__prc_name__,))
     
     # 本地ini文件存储的本线程专有配置参数
     # 定义线程循环时间、过期时间、健康时间等
-    str_ini_file_name = "prc_%s.ini" %(__prc_name__,)
+    str_ini_file_name = "prc_%s.ini" %(__prc_cli_type__,)
     __ini_prc_config__=clsConfigEx(str_ini_file_name)
     
     __prc_cycletime=__ini_prc_config__.CycleTime.prc_cycletime
     __prc_expiretime=__ini_prc_config__.CycleTime.prc_expiretime
     __prc_healthytime=__ini_prc_config__.CycleTime.prc_healthytime
     
-    # 取得ini文件中的全部条码正则表达式列表
-    # ToDo 自动遍历ini文件中，barcode字段下的所有正则表达式
-    lst_re_exp = []
-    lst_re_exp.append(__ini_prc_config__.Barcode.re_exp_01)
-    lst_re_exp.append(__ini_prc_config__.Barcode.re_exp_02)
+    # 取得ini文件中的全部声音资源列表
+    # ToDo 自动遍历ini文件中，Sound字段下的配置文件
+    dict_sound = {}
+    dict_sound['reading_gr']= __ini_prc_config__.Sound.reading_gr
+    dict_sound['reading_nr']= __ini_prc_config__.Sound.reading_nr
+    dict_sound['reading_mr']= __ini_prc_config__.Sound.reading_mr
     
-    # 向Redis注册基本信息，允许同名客户端，根据已注册的同名客户端自动取得两位数的尾号，不允许超过90个同名客户端在线
-    prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
-    index = 0
-    if prc_run_lock:
-        while prc_run_lock:
-            index = index + 1
-            if index > 90:
-                inst_logger.error("线程 %s 启动时发现了过多客户端同时在运行，退出！")
-                sys.exit(1)
-            prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}-%02d:run_lock"%(index,))
-            
-    __cli_id__ = index
     # 增加Redis中总线程计数器，并将增加后的计数器值作为当前线程的id
     __prc_id__ = inst_redis.incrkey(f"pro_mon:prc_counter")
     
     inst_logger.info("线程 %s 取得 prc_id = %d, cli_id = %d"%(__prc_name__,__prc_id__,__cli_id__)) 
-    # inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
-    inst_redis.setkey(f"pro_mon:{__prc_name__}:run_lock",__prc_id__)             ## manucal scan函数不允许超时 ##      
-    #inst_logger.info("线程 %s 已设置线程锁，过期时间 = %d ms"%(__prc_name__,__prc_expiretime)) 
-    inst_logger.info("线程 %s 已设置线程锁，过期时间 = %d ms"%(__prc_name__,-1))      ## manucal scan函数不允许超时 ##
+    inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
+    inst_logger.info("线程 %s 已设置线程锁，过期时间 = %d ms"%(__prc_name__,__prc_expiretime)) 
 
     # 增加当前线程的重启次数,如为1说明是首次启动
-    # __prc_restart__ = inst_redis.incrkey(f"pro_mon:{__prc_name__}:restart")           ## manucal scan函数不记录重启 ##
-    # inst_logger.info("线程 %s 启动次数 restart = %d"%(__prc_name__,__prc_restart__))    ## manucal scan函数不记录重启 ##
+    __prc_restart__ = inst_redis.incrkey(f"pro_mon:{__prc_name__}:restart")           ## manucal scan函数不记录重启 ##
+    inst_logger.info("线程 %s 启动次数 restart = %d"%(__prc_name__,__prc_restart__))    ## manucal scan函数不记录重启 ##
         
     # 记录线程启动时间
     __prc_start_ts__ = datetime.datetime.now()
@@ -74,45 +67,42 @@ def start_process(config_file):
    
     b_thread_running = True
     int_exit_code = 0
-    lst_reading_gr =[]
-    lst_reading_nr =[]
-    lst_reading_mr =[]
+    
+    # 初始化pygame.mixer
+    pygame.mixer.init()
+    
+    if not inst_redis.xcreategroup("stream_test", __prc_name__):
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("__prc_name__",))
+    else:
+        inst_logger.info("线程 %s 注册stream组成功" %("__prc_name__",))
     
     while b_thread_running:
         # 刷新当前线程的运行锁
-        # inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
-        # inst_redis.setkey(f"pro_mon:{__prc_name__}:run_lock",__prc_id__)             ## manucal scan函数不允许超时     
+        inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
         
         # --------------------
         # 主线程操作区
-        strManualScanBarcode = input("please enter manual scan barcode...")
         
-        # 更新set_reading_gr
-        lst_reading_gr = inst_redis.getset("set_reading_gr")
-        # 更新set_reading_nr
-        # lst_reading_nr = inst_redis.getset("set_reading_nr")
-        # 更新set_reading_mr
-        lst_reading_mr = inst_redis.getset("set_reading_mr")         
+        lst_reading_nr = list(inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
+        set_reading_mr = inst_redis.getset("set_reading_mr")        # 更新set_reading_mr
+        l = inst_redis.xreadgroup("stream_test",__prc_name__,"cliplay-id01")
+        if len(lst_reading_nr) + len(set_reading_mr) == 0:          # 正常状态，读取 stream_test, 每收到一个gr 播放一个声音l
+            if len(l)>0:                                # 收到消息
+                inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
+                for i,dictdata in l[0][1]:              # 遍历收到的所有消息
+                    if dictdata['result']=='GR':        # 正常识读
+                        mixer.music.load(dict_sound['reading_gr'])
+                        mixer.music.play()
+                    elif dictdata['result']=='MR':      # 多条码
+                        mixer.music.load(dict_sound['reading_mr'])
+                        mixer.music.play()
+                    elif dictdata['result']=='NR':      # 无条码    
+                        mixer.music.load(dict_sound['reading_nr'])
+                        mixer.music.play()                        
+        else:                                                       # 补码状态，收取HIK的读码信息，但是不播放声音，只播放补码声音
+            pass
+            
 
-        if strManualScanBarcode in lst_reading_gr:
-            print("Barcode is already exist!!")
-            continue
-        
-        if strManualScanBarcode in lst_reading_mr:      
-            print("Get MRead Barcode !!")
-            inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode,'type':'MR'})      # 插入 Manual Scan stream/MR
-            continue
-        
-        # 条码格式校验
-        bBarcodeValid = False
-        for i, re_exp in enumerate(lst_re_exp):
-            if barcode_formatcheck(strManualScanBarcode,re_exp):
-                inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode,'type':'NR'})      # 插入 Manual Scan stream/NR
-                print("Barcode valid,insert into system")
-                bBarcodeValid = True
-                break
-        if not bBarcodeValid:
-            print("Barcode is not valid!!")
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
@@ -127,7 +117,7 @@ def start_process(config_file):
                
         inst_redis.lpush(f"lst_ct:%s"%(__prc_name__,),int_last_ct_ms) # 将最新的ct插入redis中的lst_ct
         int_len_lst= inst_redis.llen(f"lst_ct:%s"%(__prc_name__,))  # 取得列表中元素的个数
-        if int_len_lst > 10:
+        if int_len_lst > 100:
             inst_redis.rpop(f"lst_ct:%s"%(__prc_name__,))    # 尾部数据弹出
         # cycletime 计算 与 healthy判断
         # ToDo 

@@ -34,6 +34,12 @@ class clsHIKCameraClient:
         self.intValidFaultNo= 0         
         self.lstUnpackBuf = []
 
+    def append_exception(self, subfunc, msg):
+        self.lstException.append(
+            {'module': f'clsHIKCameraClient.{subfunc}',
+             'timestamp': datetime.datetime.now().isoformat(),
+             'msg': msg})
+
     #创建Socket套接字，返回值为True表示连接成功 
     def connect(self):
         self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -47,7 +53,7 @@ class clsHIKCameraClient:
             self.bDISCONNECT = True         # 连接失败，标记断联
             self.int_reconnect_counter = self.int_reconnect_counter + 1     # 累加连接重试计数器
             self.int_heart_counter = 0      # 清理心跳计数器，每次重联时清零
-            self.lstException.append({'module':'clsHIKCameraClient.connect','timestamp':datetime.datetime.now().isoformat(),'msg':"连接失败:%s"%(traceback.format_exc(),)})
+            self.append_exception("connect", "连接失败:%s"%(traceback.format_exc(),))
             # Todo 后续每三次重连失败之后，放入一个长时间的sleep，避免频繁重连被ban
             return False
  
@@ -68,7 +74,7 @@ class clsHIKCameraClient:
                 if not data:                    # 返回 空 表示对方已关闭连接
                     self.bDISCONNECT = True     # 设置断连标志
                     self.bRECVThread = False    # 标记监听线程已终止
-                    self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':"连接已被对方关闭:%s"%(traceback.format_exc(),)})
+                    self.append_exception("recv_thread", "连接已被对方关闭:%s"%(traceback.format_exc(),))
                     break                      # ToDo 后续可考虑通知主线程关闭的具体时间
                 # 收到不为空的数据
                 # ToDo  如果收到超长数据，需要存下来
@@ -85,18 +91,20 @@ class clsHIKCameraClient:
                             self.convert_recvbuf(validdata)     # 数据处理函数，将缓冲区内的数据转换成期望的dict格式 
                             self.recv_buf.append(data)          # only for debug/接收缓冲区的原文
                             if len(self.lstValidData ) > 10:        # 有效数据缓冲区太满，说明主线程处理太慢
-                                self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':'有效数据缓冲区内数据过多，请及时处理！！'})
+                                self.append_exception("recv_thread", "有效数据缓冲区内数据过多，请及时处理！！")
                     else:                                   # 未预料的数据包，或超长数据
-                        self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':"接收缓冲区校验失败,错误代码%d, 缓存区数据:%s"%(self.intValidFaultNo,data.decode('utf-8'))})
+                        self.append_exception("recv_thread", "接收缓冲区校验失败,错误代码%d, 缓存区数据:%s"
+                                  %(self.intValidFaultNo,data.decode('utf-8')))
                         # ToDo缓存校验失败的数据，与下一次读取的拼成一个包，再校验一次
                 self.lstUnpackBuf.clear()
                 time.sleep(0.1)        
             except Exception as e:
                 self.bDISCONNECT = True
                 self.bRECVThread = False
-                self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':"监听线程异常退出,线程编号%d, 异常信息:%s"%(self.int_thread_counter,traceback.format_exc())})
+                self.append_exception("recv_thread", "监听线程异常退出,线程编号%d, 异常信息:%s"
+                          %(self.int_thread_counter,traceback.format_exc()))
                 break       
-        self.lstException.append({'module':'clsHIKCameraClient.recv_thread', 'timestamp':datetime.datetime.now().isoformat(),'msg':"线程退出，编号:%d"%(self.int_thread_counter,)})
+        self.append_exception("recv_thread", "线程退出，编号:%d"%(self.int_thread_counter,))
         time.sleep(3)       # 等待exception 消息输出
         self.bExit = True
     
@@ -113,13 +121,13 @@ class clsHIKCameraClient:
                 else:                               # 有包黏连
                     new_recv_data = recv_data.replace('}{','}^{')
                     lst_uppack_buf = new_recv_data.split('^')
-                    self.lstException.append({'module':'clsHIKCameraClient.unpack_buf', 'timestamp':datetime.datetime.now().isoformat(),'msg':"发现黏连的数据包，个数:%d"%(len(lst_uppack_buf),)})
+                    self.append_exception("unpack_buf", "发现黏连的数据包，个数:%d"%(len(lst_uppack_buf),))
                 return lst_uppack_buf
             else:                                   # 后缀不完整，ToDo要将这段数据存起来，等着下一次读取的拼在一起
-                self.lstException.append({'module':'clsHIKCameraClient.unpack_buf', 'timestamp':datetime.datetime.now().isoformat(),'msg':"发现数据包后缀不完整"})
+                self.append_exception("unpack_buf", "发现数据包后缀不完整")
                 return None
         else:                                       # 开头不完整，ToDo要与上一次的数据拼在一起
-            self.lstException.append({'module':'clsHIKCameraClient.unpack_buf', 'timestamp':datetime.datetime.now().isoformat(),'msg':"发现数据包前缀不完整"})
+            self.append_exception("unpack_buf", "发现数据包前缀不完整")
             return None 
         
 
@@ -143,7 +151,7 @@ class clsHIKCameraClient:
             #Todo 查找uid、reqTime、reqCode、read、code、type是否在keys中
             
         except Exception as e:
-            self.lstException.append({'module':'clsHIKCameraClient.check_recvbuf', 'timestamp':datetime.datetime.now().isoformat(),'msg':"数据解析出现异常: %s"%(traceback.format_exc(),)})
+            self.append_exception("check_recvbuf", "数据解析出现异常: %s"%(traceback.format_exc(),))
             return None        
         PassedDict = {}
         # print(dict_recv_data) 
@@ -220,8 +228,7 @@ class clsHIKCameraClient:
             center_y = YSum // 4
             return {'x': center_x, 'y': center_y}
         except Exception as e:
-            self.lstException.append({'module':'clsHIKCameraClient.check_recvbuf', 'timestamp':datetime.datetime.now().isoformat(),'msg':"数据解析出现异常: %s"%(traceback.format_exc(),)})
-            return False 
+            self.append_exception("check_recvbuf", "数据解析出现异常: %s"%(traceback.format_exc(),))
 
         
     # 数据处理函数,将处理完成的数据插入lstValidData,并标记bRecvValidData = True
@@ -260,7 +267,7 @@ class clsHIKCameraClient:
                 self.lstValidData.append(dictValidData.copy())
             self.bRecvValidData = True
         else:
-            self.lstException.append({'module':'clsHIKCameraClient.convert_recvbuf', 'timestamp':datetime.datetime.now().isoformat(),'msg':'数据解析发生异常'})
+            self.append_exception("check_recvbuf", "数据解析出现异常")
 
         
     #将缓冲区内的数据，发送至服务器
@@ -269,8 +276,7 @@ class clsHIKCameraClient:
             self.conn.sendall(data)
             return True
         else:
-            self.lstException.append({'module':'clsHIKCameraClient.send', 'timestamp':datetime.datetime.now().isoformat(),'msg':'连接尚未建立,无法发送数据'})
-            #raise ConnectionError("Connection closed.")
+            self.append_exception("check_recvbuf", "连接尚未建立,无法发送数据")
             return False
 
     #生成心跳数据
