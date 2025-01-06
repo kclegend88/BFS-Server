@@ -16,6 +16,7 @@ from fRedis import clsRedis
 #from prc_stmC import start_process as start_stmC
 from prc_cli_manualscan import start_process as start_cli_manualscan
 from prc_cli_playsound import start_process as start_cli_playsound
+from main_cli_qt import start_process as start_cli_qt
 
 
 class main:
@@ -24,7 +25,7 @@ class main:
         __version__='0.1.0'
         
         # 定义线程总表，所有在该表格中的线程由main启动并监控
-        self.lst_thread_name = ["cli_manualscan","cli_playsound"]
+        self.lst_thread_name = ["cli_manualscan","cli_playsound", "cli_qt"]
         
 
     def run(self):
@@ -67,6 +68,7 @@ class main:
                     cli_prc_running=inst_redis.getkey(f"sys_cli%02d:ready"%(index,))
             
             __cli_id__ = index
+            inst_redis.setkey(f"sys_cli%02d:ready"%(__cli_id__,),"ready")
             inst_logger.info("Redis 连接成功")
         except:
             inst_logger.error("Redis连接失败"+traceback.format_exc())

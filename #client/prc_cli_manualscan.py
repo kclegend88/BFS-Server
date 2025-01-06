@@ -88,14 +88,39 @@ def start_process(config_file,__cli_id__):
         
         # --------------------
         # 主线程操作区
-        strManualScanBarcode = input("please enter manual scan barcode...")
-        
+        # strManualScanBarcode = input("please enter manual scan barcode...")
+        strManualScanBarcode = inst_redis.getkey(f"manualscan:%02d:input"@(__cli_id__,))
+
         # 更新set_reading_gr
         lst_reading_gr = inst_redis.getset("set_reading_gr")
         # 更新set_reading_nr
         # lst_reading_nr = inst_redis.getset("set_reading_nr")
         # 更新set_reading_mr
         lst_reading_mr = inst_redis.getset("set_reading_mr")         
+
+        if strstrManualScanBarcode.startswith("##"):
+            str_special = strstrManualScanBarcode[2:]
+            if str_special in lst_reading_mr:
+                print("Get SPECIAL    MRead Barcode !!")
+                inst_redis.xadd( "str_special", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':str_special,'type':'MR'})
+                mixer.music.load(dict_sound['ms_barcode_rescan_accpet'])
+                mixer.music.play()
+                break
+            else: 
+                bBarcodeValid = False
+                for i, re_exp in enumerate(lst_re_exp):
+                    if barcode_formatcheck(str_special,re_exp):
+                        inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':str_special,'type':'NR'})
+                        print(" SPECIAL    Barcode valid,insert into system")
+                        bBarcodeValid = True
+                        mixer.music.load(dict_sound['ms_barcode_rescan_accpet'])
+                        mixer.music.play()                
+                        break
+                if not bBarcodeValid:
+                    print("Barcode is not valid!!")
+                    mixer.music.load(dict_sound['ms_barcode_reject'])
+                    mixer.music.play()
+                    break
 
         if strManualScanBarcode in lst_reading_gr:
             print("Barcode is already exist!!")

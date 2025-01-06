@@ -168,13 +168,18 @@ Add #client folder
 	client computer run client in this folder. server run client in origin folder
 Fix fRedis keysbuf bug
 Fix cli_play MR sound bug
-Update PLC, test and success, together update stmHIKC
+Update PLC, test and success, together update stmHIKC and stmManualScan,
 
+# Rev 0.3.2
+Add media to #client folder
+	sys.path is not work when pygame get media files.
 
+Not solve fRedis getkey--> key not existing fault, just comment this line
+Add prc_mon, modify main.py, when enter 'Y', pro_mon send 'exit' comment and waiting for process cleanup and exit properly.
 
-Update fRedis, 
-	add lstException, add keysbuf, return keysbuf not keys-scan 
-	add init_prc, all redis regist function inside. only need prc_name.
-Update prc_template to 0.3.0
-Update HIKCamera,PLC,stmHIKC,stmMS to template 0.3.0
-Update fPLC function, reconstruct command and status,add autostart,autostop command.
+Update PLC, when exit stop all conv
+Update stmHIKC_data, add redis exception print function,and exit function
+Update stmManualScan, add redis exception print function,and exit function
+Update stmReadingConfirm from template 2.0-->3.0
+
+Add cli_qt, show parcel position and list, testing

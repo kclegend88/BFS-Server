@@ -106,7 +106,12 @@ def start_process(config_file):
         l = inst_redis.xreadgroup("stream_test","HIKC_data","HIKC_data-id01")
         if len(l)>0 :                       # 收到消息
             prc_stmhikc_dataproc(l[0][1])
-            
+        
+        for i, e in enumerate(inst_redis.lstException):
+            inst_logger.error(
+                "线程 %s 运行过程中发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                % (__prc_name__,e['module'], e['timestamp'], e['msg']))            
+        inst_redis.lstException.clear()
         # 以上为主线程操作区       
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
@@ -120,7 +125,13 @@ def start_process(config_file):
         if prc_run_lock is None:  
             # --------------------
             # 以下为定制区域，用于中止线程内创建的线程或调用的函数
-
+            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            for i, e in enumerate(inst_redis.lstException):
+                inst_logger.error(
+                    "线程 %s 超时退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                    % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+            inst_redis.lstException.clear()
+            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
             # 以上为定制区域，用于中止线程内创建的线程或调用的函数           
             # --------------------
             int_exit_code = 1
@@ -131,6 +142,14 @@ def start_process(config_file):
         if prc_run_lock == "exit":
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
+            
+            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
+            for i, e in enumerate(inst_redis.lstException):
+                inst_logger.error(
+                    "线程 %s 受控退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                    % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+            inst_redis.lstException.clear()
             int_exit_code = 2
             break
     

@@ -57,7 +57,7 @@ class clsRedis:
                 if self.__isconnected__:        # 确认连接状态
                     value = self.decoded_connection.get(f"{key}")
                     if value is None:           # Redis返回空值,说明key不存在
-                        self.append_exception("getkey", "未创建的key:%s"%(traceback.format_exc(),))
+                        # self.append_exception("getkey", "未创建的key:%s, %s"%(key, traceback.format_exc(),))
                         return None
                     else:
                         return value
@@ -83,8 +83,7 @@ class clsRedis:
             try:
                 if self.__isconnected__:        # 确认连接状态
                     if not key in self.dictKeyBuffer:
-                        self.append_exception("getkey", "读取key:%s 时发生异常:%s" % (key, traceback.format_exc()))
-                        self.append_exception("clearkey", "尝试删除一个不存在的key")
+                        self.append_exception("clearkey", "尝试删除一个不存在的key%s: %s" % (key, traceback.format_exc()))
                         return None
                     else:
                         value = self.dictKeyBuffer.pop(f"{key}",None)
@@ -132,6 +131,8 @@ class clsRedis:
             self.setkey(f"pro_mon:{prc_name}:lu_ts", prc_luts.isoformat())
             self.dictPrcLuts[prc_name] = prc_luts
 
+            self.setkey(f"pro_mon:{prc_name}:command", "run")
+
             # 将当前线程加入Redis 线程集合中
             self.sadd("set_process", "name=%s/id=%d" % (prc_name, prc_id))
             #inst_logger.info("线程 %s 已添加至线程集合中" % (__prc_name__,))
@@ -165,7 +166,19 @@ class clsRedis:
             return lst_result
         else:
             return None
-
+    
+    def xdelgroup(self,sname,gname):
+        try:
+            if self.__isconnected__:        # 确认连接状态
+                self.decoded_connection.xgroup_destroy(f"{sname}", f"{gname}")
+                return
+            else:                        # 返回未连接错误
+                self.append_exception("xdelgroup", "Redis未连接")
+                return None
+        except Exception as e:
+            self.append_exception("xdelgroup", "sname:%s gname= %s 时发生异常，%s"%(sname,gname,traceback.format_exc()))
+            return None
+            
     def incrkey(self, key , incrby = 1):
         # 增加键对值，并返回结果
         if self.__isconnected__:
@@ -366,3 +379,7 @@ class clsRedis:
             return value
         else:
             raise Exception("Redis尚未建立连接")
+    
+    def keys(self, pattern):
+        # 获取所有匹配的键
+        return self.decoded_connection.keys(pattern)

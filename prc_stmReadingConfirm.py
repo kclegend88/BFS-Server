@@ -17,6 +17,7 @@ def start_process(config_file):
     inst_logger.info("线程 %s 正在启动" %(__prc_name__,))
     
     # 本地ini文件存储的本线程专有配置参数
+
     # 定义线程循环时间、过期时间、健康时间等
     str_ini_file_name = "prc_%s.ini" %(__prc_name__,)
     __ini_prc_config__=clsConfigEx(str_ini_file_name)
@@ -25,39 +26,25 @@ def start_process(config_file):
     __prc_expiretime=__ini_prc_config__.CycleTime.prc_expiretime
     __prc_healthytime=__ini_prc_config__.CycleTime.prc_healthytime
     
-    # 向Redis注册基本信息
-    prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
-    if prc_run_lock is None:    
-        # Redis中不存在该线程的运行锁，说明没有同名线程正在运行，无线程冲突，可以直接启动
-        # 增加Redis中总线程计数器，并将增加后的计数器值作为当前线程的id
-        __prc_id__ = inst_redis.incrkey(f"pro_mon:prc_counter")
-        inst_logger.info("线程 %s 取得 id = %d"%(__prc_name__,__prc_id__)) 
-        inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
-        inst_logger.info("线程 %s 已设置线程锁，过期时间 = %d ms"%(__prc_name__,__prc_expiretime)) 
 
-        # 增加当前线程的重启次数,如为1说明是首次启动
-        __prc_restart__ = inst_redis.incrkey(f"pro_mon:{__prc_name__}:restart")
-        inst_logger.info("线程 %s 启动次数 restart = %d"%(__prc_name__,__prc_restart__)) 
-        
-        # 记录线程启动时间
-        __prc_start_ts__ = datetime.datetime.now()
-        inst_redis.setkey(f"pro_mon:{__prc_name__}:start_ts",__prc_start_ts__.isoformat())
-        inst_logger.info("线程 %s 启动时间 start_ts= %s"%(__prc_name__,__prc_start_ts__.isoformat()))
-        
-        # 记录线程上次刷新时间，用于持续计算线程的cycletime
-        prc_luts=__prc_start_ts__
-        inst_redis.setkey(f"pro_mon:{__prc_name__}:lu_ts",prc_luts.isoformat())
-        
-        # 将当前线程加入Redis 线程集合中
-        inst_redis.sadd("set_process","name=%s/id=%d"%(__prc_name__,__prc_id__))
-        inst_logger.info("线程 %s 已添加至线程集合中" %(__prc_name__,))
-                
-    else:
-        # Redis中存在该线程的运行锁，说明已经有同名线程正在运行
-        # 记录线程冲突错误并退出
-        # ToDo 将此类重要错误 使用stm_sys_log进行永久化记录
-        inst_logger.error("线程 %s 启动时发现了运行冲突,同名线程已存在,id= %d"%(__prc_name__,prc_run_lock))
-        exit()
+    # --------------------    
+    # 定制化配置参数读取区
+
+    # 定制化配置参数读取区
+    # --------------------
+   
+    # 系统将初始化信息写入Redis
+    __prc_id__ = inst_redis.init_prc(__prc_name__,__prc_expiretime)
+    if not __prc_id__:  # 取得异常消息队列中的信息
+        for i, e in enumerate(inst_redis.lstException):
+            inst_logger.error(
+                "线程 %s 注册 Redis 服务器失败，调用模块 %s，调用时间 %s，异常信息 %s "
+                % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+        inst_redis.lstException.clear()
+        return       # Redis 注册失败失败
+    
+    # --------------------    
+    # 以下为定制初始化区域
     
     if not inst_redis.xcreategroup("stream_reading_confirm", "ReadingConfirm"):
         inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("ReadingConfirm",))
@@ -109,18 +96,8 @@ def start_process(config_file):
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
         # 线程运行时间与健康程度判断
-                
-        current_ts=datetime.datetime.now()  
-        td_last_ct = current_ts - prc_luts  # datetime对象相减得到timedelta对象
-        int_last_ct_ms = int(td_last_ct.total_seconds()*1000) # 取得毫秒数（int格式)
+        inst_redis.ct_refresh(__prc_name__)
         
-        prc_luts=current_ts # 刷新luts
-        inst_redis.setkey(f"pro_mon:{__prc_name__}:lu_ts",current_ts.isoformat()) # 更新redis中的luts
-               
-        inst_redis.lpush(f"lst_ct:%s"%(__prc_name__,),int_last_ct_ms) # 将最新的ct插入redis中的lst_ct
-        int_len_lst= inst_redis.llen(f"lst_ct:%s"%(__prc_name__,))  # 取得列表中元素的个数
-        if int_len_lst > 10:
-            inst_redis.rpop(f"lst_ct:%s"%(__prc_name__,))    # 尾部数据弹出
         # cycletime 计算 与 healthy判断
         # ToDo 
         
@@ -130,6 +107,17 @@ def start_process(config_file):
         #如线程运行锁过期或被从外部删除，则退出线程
         prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
         if prc_run_lock is None:  
+            # --------------------
+            # 以下为定制区域，用于中止线程内创建的线程或调用的函数            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            for i, e in enumerate(inst_redis.lstException):
+                inst_logger.error(
+                    "线程 %s 超时退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                    % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+            inst_redis.lstException.clear()
+            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
+            # 以上为定制区域，用于中止线程内创建的线程或调用的函数           
+            # --------------------
+
             int_exit_code = 1           
             break
         
@@ -138,6 +126,14 @@ def start_process(config_file):
         if prc_run_lock == "exit":
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
+            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            for i, e in enumerate(inst_redis.lstException):
+                inst_logger.error(
+                    "线程 %s 超时退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                    % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+            inst_redis.lstException.clear()
+            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
+
             int_exit_code = 2          
             break
     conn.close()

@@ -313,7 +313,8 @@ def start_process(config_file):
         if prc_run_lock is None:  
             # --------------------
             # 以下为定制区域，用于中止线程内创建的线程或调用的函数
-
+            prc_PLC_stopconv()
+            time.sleep(3)
             # 以上为定制区域，用于中止线程内创建的线程或调用的函数           
             # --------------------
             int_exit_code = 1
@@ -324,6 +325,8 @@ def start_process(config_file):
         if prc_run_lock == "exit":
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
+            prc_PLC_stopconv()
+            time.sleep(3)
             int_exit_code = 2
             break
     
