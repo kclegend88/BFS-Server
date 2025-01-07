@@ -71,11 +71,18 @@ def start_process(config_file,__cli_id__):
     # 初始化pygame.mixer
     pygame.mixer.init()
     
-    if not inst_redis.xcreategroup("stream_test", __prc_name__):
-        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("__prc_name__",))
+    REST = inst_redis.xcreategroup("stream_test", __prc_name__)
+    if REST :   # 返回值不为空，说明异常信息
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在， %s " %(__prc_name__, REST))
+        for i, e in enumerate(inst_redis.lstException):
+            inst_logger.error(
+                "线程 %s 运行过程中发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+        inst_redis.lstException.clear()
     else:
-        inst_logger.info("线程 %s 注册stream组成功" %("__prc_name__",))
-    
+        inst_logger.info("线程 %s 注册stream组成功, %s " %(__prc_name__,REST))
+
+
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
@@ -132,15 +139,20 @@ def start_process(config_file,__cli_id__):
             break
         
         #如command区收到退出命令，根据线程类型决定是否立即退出
-        prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:command")
+        prc_run_lock=inst_redis.getkey(f"sys:cli{__cli_id__:02}:command")
         if prc_run_lock == "exit":
+            inst_logger.info("线程 %s 已收到退出信号" %(__prc_name__,))
+            inst_redis.xdelgroup("stream_test", __prc_name__)
+            inst_logger.info("线程 %s 删除stream组成功" %(__prc_name__,))
+            for i, e in enumerate(inst_redis.lstException):
+                inst_logger.error(
+                    "线程 %s 受控退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                    % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+            inst_redis.lstException.clear()
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
             int_exit_code = 2           
             break
-    inst_redis.clearkey(f"pro_mon:{__prc_name__}-%02d:run_lock"%(__cli_id__,))
+    inst_redis.clearkey(f"pro_mon:{__prc_name__}:run_lock")
     inst_logger.info("线程 %s 已退出，返回代码为 %d" %(__prc_name__,int_exit_code))
-
-
-
 

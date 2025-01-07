@@ -107,10 +107,16 @@ def start_process(config_file):
 
     # --------------------    
     # 以下为定制初始化区域
-    if not inst_redis.xcreategroup("stream_manualscan", "manualscan"):
-        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("manualscan",))
+    REST = inst_redis.xcreategroup("stream_manualscan", "manualscan")
+    if REST :   # 返回值不为空，说明异常信息
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在， %s " %("manualscan", REST))
+        for i, e in enumerate(inst_redis.lstException):
+            inst_logger.error(
+                "线程 %s 运行过程中发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+        inst_redis.lstException.clear()
     else:
-        inst_logger.info("线程 %s 注册stream组成功" %("manualscan",))
+        inst_logger.info("线程 %s 注册stream组成功, %s " %("manualscan",REST))
     dictdata={}
     lstdictdata=[]
     set_reading_mr={}
@@ -167,13 +173,14 @@ def start_process(config_file):
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
             
-            inst_redis.xdelgroup("stream_test", "HIKC_data")
-            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
+
+            inst_logger.info("线程 %s 删除stream组 %s 成功" %(__prc_name__,"manualscan"))
             for i, e in enumerate(inst_redis.lstException):
                 inst_logger.error(
                     "线程 %s 受控退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
                     % (__prc_name__,e['module'], e['timestamp'], e['msg']))
             inst_redis.lstException.clear()
+            inst_redis.xdelgroup("stream_manualscan", "manualscan")
             int_exit_code = 2
             break
     

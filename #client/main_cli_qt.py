@@ -8,9 +8,9 @@ import traceback
 import pygame
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtWidgets import QWidget, QGridLayout, QApplication, QFrame, QLabel, QVBoxLayout, QSplitter, QHBoxLayout, \
-    QTableWidgetItem
+    QTableWidgetItem, QLineEdit, QPushButton
 
 from fBarcode import barcode_formatcheck
 from fLog import clsLogger
@@ -22,13 +22,14 @@ from pygame import mixer
 
 class BarcodeDisplay(QWidget):
     try:
-        def __init__(self, inst_redis, __cli_id__, inst_logger, __prc_name__, is_image):
+        def __init__(self, inst_redis, __cli_id__, inst_logger, __prc_name__, __ini_prc_config__):
             super().__init__()
             self.inst_redis = inst_redis
             self.__cli_id__ = __cli_id__
             self.inst_logger = inst_logger
             self.__prc_name__ = __prc_name__
-            self.is_image = is_image
+            self.is_image = __ini_prc_config__.qt.image
+            self.level = __ini_prc_config__.qt.level
             self.barcode_input = ""  # 用来存储接收到的条码
             self.init_ui()
 
@@ -50,22 +51,31 @@ class BarcodeDisplay(QWidget):
 
             # 创建左侧皮带机布局
             self.pidaiji_layout = QGridLayout()
+            # 设置水平间距
+            self.pidaiji_layout.setHorizontalSpacing(0)  # 水平间距为 10 像素
+
+            # 设置垂直间距
+            self.pidaiji_layout.setVerticalSpacing(0)  # 垂直间距为 10 像素
             self.pidaijiCreate()
             # 设置皮带机布局的背景图片
 
-            # 创建背景容器
-            self.background_label = QLabel(self)
-            # 加载并调整背景图片大小
-            original_pixmap = QPixmap('')  # 替换为您的背景图片路径
-            scaled_pixmap = original_pixmap.scaled(QSize(1200, 600), Qt.AspectRatioMode.KeepAspectRatio,
-                                                   Qt.TransformationMode.SmoothTransformation)
-            self.background_label.setPixmap(scaled_pixmap)
-            self.background_label.setAlignment(Qt.AlignCenter)
-            # 将布局添加到背景容器
-            self.background_label.setLayout(self.pidaiji_layout)
+            #  设置输入框 和一个提交按钮
+            self.input = QLineEdit(self)
+            self.input.setPlaceholderText("输入条码")  # 设置输入框的占位符文本
+            self.input.setObjectName("edit2")
+            # self.input.setFocusPolicy(Qt.NoFocus)
+            # 创建提交按钮
+            self.btn_submit = QPushButton("提交", self)
+            self.btn_submit.setObjectName("submitbutton")
+            self.btn_submit.setIcon(QtGui.QIcon("./pic/submit.png"))
+            self.btn_submit.setIconSize(QtCore.QSize(28, 28))
+            # self.btn_submit.setFixedSize(100, 40)  # 设置按钮大小
+            self.btn_submit.clicked.connect(self.submit_clicked)
 
             leftlayout.addWidget(self.label, 3)  # 设置比例
-            leftlayout.addWidget(self.background_label, 1)
+            leftlayout.addWidget(self.input, 1)
+            leftlayout.addWidget(self.btn_submit, 1)
+            leftlayout.addLayout(self.pidaiji_layout, 2)
 
             # 创建右侧布局 table控件
             self.table_layout = QHBoxLayout()
@@ -79,13 +89,17 @@ class BarcodeDisplay(QWidget):
 
             # 设置窗口的布局
             self.setLayout(main_layout)
-            # 最大化
-            self.showMaximized()
 
             # 开启线程 循环更新表格内容
             self.timer = QtCore.QTimer()
             self.timer.timeout.connect(self.update_table)
-            self.timer.start(1000)
+            self.timer.start(500)
+            style_file = './qss/table.qss'
+            with open(style_file, 'r', encoding='utf-8') as f:
+                self.setStyleSheet(f.read())
+            # 最大化
+            self.showMaximized()
+            self.setFocus()
 
         def update_barcode(self, strManualScanBarcode):
             self.label.setText(f"接收到的条码：{strManualScanBarcode}")
@@ -103,8 +117,9 @@ class BarcodeDisplay(QWidget):
                 if key == Qt.Key_Return or key == Qt.Key_Enter:
                     # print(self.barcode_input)
                     # 回车键表示条码输入完成
-                    self.update_barcode(self.barcode_input)
-                    self.barcode_input = ""  # 清空当前条码
+                    if self.barcode_input:
+                        self.update_barcode(self.barcode_input)
+                        self.barcode_input = ""  # 清空当前条码
                 else:
                     # 添加按下的字符到条码输入
                     self.barcode_input += event.text()
@@ -120,21 +135,21 @@ class BarcodeDisplay(QWidget):
 
     def tableCreate(self):
         font = QtGui.QFont()
-        font.setPointSize(12)
+        font.setPointSize(17)
         self.tableWidget = QtWidgets.QTableWidget()
         self.tableWidget.setFont(font)
         self.tableWidget.setAutoScrollMargin(16)
-        self.tableWidget.setRowCount(50)
+        self.tableWidget.setRowCount(20)
         self.tableWidget.setObjectName("tableWidget")
         self.tableWidget.setColumnCount(4)
         self.tableWidget.setHorizontalHeaderLabels(["条码", "X值", "Y值", "状态"])
         self.tableWidget.horizontalHeader().setDefaultSectionSize(258)
-        self.tableWidget.setColumnWidth(0, 300)
+        self.tableWidget.setColumnWidth(0, 270)
         self.tableWidget.setColumnWidth(1, 100)
         self.tableWidget.setColumnWidth(2, 100)
         self.tableWidget.setColumnWidth(3, 100)
         # self.tableWidget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 左右滚动条
-        self.tableWidget.verticalHeader().setDefaultSectionSize(50)  # 设置行高为50像素（根据需要调整）
+        self.tableWidget.verticalHeader().setDefaultSectionSize(100)  # 设置行高为50像素（根据需要调整）
         self.tableWidget.horizontalHeader().setMinimumSectionSize(31)
         # 设置整个表格为只读
         self.tableWidget.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
@@ -152,6 +167,7 @@ class BarcodeDisplay(QWidget):
                     frame = QFrame(self)
                     frame.setFrameShape(QFrame.StyledPanel)
                     frame.setMaximumWidth(300)
+
                     frame.setMaximumHeight(100)
                     frame.setStyleSheet("background-color: grey; border: 1px solid black;")
                     self.pidaiji_layout.addWidget(frame, i, j)
@@ -165,13 +181,35 @@ class BarcodeDisplay(QWidget):
                     frame.setFrameShape(QFrame.StyledPanel)
                     frame.setMaximumWidth(300)
                     frame.setMaximumHeight(100)
-                    frame.setStyleSheet("background-color: grey; border: 1px solid black;")
+                    frame.setStyleSheet("background-color: grey; border: 0px solid black;")
                     self.pidaiji_layout.addWidget(frame, i, 5 - j)  # 从右往左添加
                     frame.setObjectName(str(counter))
                     counter += 1
-
+        if self.level == 0:
+            self.y1 = int(0)
+            self.y2 = int(400)
+            self.y3 = int(400)
+            self.y4 = int(800)
+            self.y5 = int(800)
+            self.y6 = int(1200)
+        else:
+            self.y1 = int(800)
+            self.y2 = int(1200)
+            self.y3 = int(400)
+            self.y4 = int(800)
+            self.y5 = int(0)
+            self.y6 = int(400)
     def update_table(self):
         try:
+            #如command区收到退出命令，根据线程类型决定是否立即退出
+            prc_run_lock=self.inst_redis.getkey(f"sys:cli{self.__cli_id__:02}:command")
+            if prc_run_lock == "exit":
+                # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
+                # 如有则暂缓退出，如没有立即退出
+                self.close()
+                int_exit_code = 2           
+                return            
+            
             # 先将所有颜色恢复成灰色
             for i in range(18):
                 frame = self.findChild(QFrame, str(i))
@@ -182,13 +220,11 @@ class BarcodeDisplay(QWidget):
             self.tableWidget.clearContents()
             # 获取所有匹配的 parcel:scan_result:* 键
             keys = self.inst_redis.keys('parcel:scan_result:*')
+            # keys = self.inst_redis.getbuff('parcel:scan_result:*')
             # print(keys)
-            if not keys:
-                self.tableWidget.clearContents()
-                return
             # 存储结果的列表
             results = []
-            #print(keys)
+            # print(keys)
             for key in keys:
                 # 解码键名
                 key_str = key
@@ -198,8 +234,8 @@ class BarcodeDisplay(QWidget):
                     return
                 parts = key_str.split(':')
                 if len(parts) == 3 and parts[0] == 'parcel' and parts[1] == 'scan_result':
+
                     B_id = parts[2]
-                    # print(B_id)
                     # 构建对应的 posx, posy, scan_result 键
                     barcode_key = f"parcel:barcode:{B_id}"
                     posx_key = f"parcel:posx:{B_id}"
@@ -237,10 +273,21 @@ class BarcodeDisplay(QWidget):
                         scan_result = "red"
                     elif scan_result_value == 'MR':
                         scan_result = "blue"
+                    # 设置背景颜色为scan_result
+
+                    # 创建一个新的 QTableWidgetItem 对象，并设置其背景色
+                    # item = QTableWidgetItem(result['scan_result'])  # 保留原来的文本
+                    # #print(scan_result)
+                    # item.setBackground(QColor(scan_result))  # 设置背景颜色
+                    # 更新表格中的单元格
+                    # self.tableWidget.setItem(row, 3, item)
                     # 第一列
+                    # if posx_value == None or posy_value == None:
+                    #     continue
+
                     posx_value1 = int(posx_value)
                     posy_value1 = int(posy_value)
-                    if 0 <= posy_value1 < 400:
+                    if self.y1 <= posy_value1 < self.y2:
                         if 1700 <= posx_value1 < 2266:
                             self.updateColor(0, scan_result)
                         if 2266 <= posx_value1 < 2832:
@@ -254,22 +301,21 @@ class BarcodeDisplay(QWidget):
                         if 4530 <= posx_value1 < 5100:
                             self.updateColor(5, scan_result)
                     # 第二列
-                    if 400 <= posy_value1 < 800:
-                        if 566 <= posx_value1 < 1132:
-                            if 1700 <= posx_value1 < 2266:
-                                self.updateColor(6, scan_result)
-                            if 2266 <= posx_value1 < 2832:
-                                self.updateColor(7, scan_result)
-                            if 2832 <= posx_value1 < 3398:
-                                self.updateColor(8, scan_result)
-                            if 3398 <= posx_value1 < 3964:
-                                self.updateColor(9, scan_result)
-                            if 3964 <= posx_value1 < 4530:
-                                self.updateColor(10, scan_result)
-                            if 4530 <= posx_value1 < 5100:
-                                self.updateColor(11, scan_result)
+                    if self.y3 <= posy_value1 < self.y4:
+                        if 1700 <= posx_value1 < 2266:
+                            self.updateColor(6, scan_result)
+                        if 2266 <= posx_value1 < 2832:
+                            self.updateColor(7, scan_result)
+                        if 2832 <= posx_value1 < 3398:
+                            self.updateColor(8, scan_result)
+                        if 3398 <= posx_value1 < 3964:
+                            self.updateColor(9, scan_result)
+                        if 3964 <= posx_value1 < 4530:
+                            self.updateColor(10, scan_result)
+                        if 4530 <= posx_value1 < 5100:
+                            self.updateColor(11, scan_result)
                     # 第三列
-                    if 800 <= posy_value1 < 1200:
+                    if self.y5 <= posy_value1 < self.y6:
                         if 1700 <= posx_value1 < 2266:
                             self.updateColor(12, scan_result)
                         if 2266 <= posx_value1 < 2832:
@@ -289,8 +335,15 @@ class BarcodeDisplay(QWidget):
             self.inst_logger.error(f"线程{self.__prc_name__}发生错误,错误为{traceback.format_exc()}")
             print(traceback.format_exc())
 
+    def submit_clicked(self):
+        try:
+            # print(1)
+            self.setFocus()
+        except Exception as e:
+            print(traceback.format_exc())
+
     def updateColor(self, name, result):
-        #print(name, result)
+        # print(name, result)
         # 检查是否为绿色  如果是绿色 不覆盖 直接跳过
 
         name = str(name)
@@ -330,6 +383,7 @@ def start_process(config_file, __cli_id__):
     print("cli_manualscan start")
     # 创建条码显示窗口
     app = QApplication(sys.argv)
-    barcode_display = BarcodeDisplay(inst_redis, __cli_id__, inst_logger, __prc_name__, is_image)
+    barcode_display = BarcodeDisplay(inst_redis, __cli_id__, inst_logger, __prc_name__, __ini_prc_config__)
     barcode_display.show()
+    inst_logger.info("线程 %s 已关闭窗口id = %d" % (__prc_name__, __cli_id__))
     sys.exit(app.exec_())

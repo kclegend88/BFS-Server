@@ -1,5 +1,4 @@
 # Key:
-
 **sys:ready**: True/False
 	设备主程序运行标志位  
 **sys:device_name**: string

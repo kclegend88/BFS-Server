@@ -18,6 +18,7 @@
 
 ### Urgent
 
+- [ ] cli_playsound creater xgroup start from now, not from 0
 - [ ] PLC Comm process, read-write, record trigger-->stm
 - [ ] DSS Comm process, stm_RC--> DSS Database
 - [ ] DSS: status transfer process, transfer log(reason, ts, status before/after)

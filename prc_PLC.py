@@ -251,8 +251,8 @@ def start_process(config_file):
     plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")   
 
     if __ini_start_conv:            #根据配置文件决定，是否直接启动输送机
-        prc_PLC_startconv()
-    # 以上为定制初始化区域           
+        inst_redis.setkey("plc_conv:command","start")
+    # 以上为定制初始化区域
     # --------------------    
 
     # 主线程变量初始化：启动变量，退出返回值

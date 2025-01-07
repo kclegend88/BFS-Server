@@ -104,7 +104,8 @@ class main:
         # 打印所有线程名称
         for i,th in enumerate(lst_thread):
             print(th.getName())
-        
+
+        time.sleep(3)
         while True:
             strInput = input("Type 'Y' and press enter if you want to exit...: ")
             if strInput == 'Y':
@@ -134,6 +135,7 @@ if __name__ == '__main__':
         print(traceback.format_exc())
         if app.status < 125:    # 清理单一实例锁
             app.inst_redis.setkey(f"sys:ready", "false")
+            app.inst_logger.info("sys:ready 已清除, sys status = %d"@(app.status))
     except Exception as e:
         print("其他异常")
         print(e)

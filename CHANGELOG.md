@@ -183,3 +183,13 @@ Update stmManualScan, add redis exception print function,and exit function
 Update stmReadingConfirm from template 2.0-->3.0
 
 Add cli_qt, show parcel position and list, testing
+
+# Rev 0.3.2
+Update main_cli, add lst_thread, add exit code, add prc join, send syc:cli<xx>:comannd by "exit“ and clean sys：cli<xx>:ready
+
+Update cli_ms to template 0.3, fix can not exit bug, add exit code and delete xgroup
+update all stm relative py file, modified all xgroupcreate code , rest = none means no prolbem...，add exit code for xgroup delete
+fix some group name fault
+
+Add function for parcel position shown, on cli_qt
+

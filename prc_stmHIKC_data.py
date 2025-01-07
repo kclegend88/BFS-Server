@@ -87,11 +87,17 @@ def start_process(config_file):
     
     # --------------------    
     # 以下为定制初始化区域
-    if not inst_redis.xcreategroup("stream_test", "HIKC_data"):
-        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("HIKC_data",))
+    REST = inst_redis.xcreategroup("stream_test", "HIKC_data")
+    if REST :   # 返回值不为空，说明异常信息
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在， %s " %("HIKC_data", REST))
+        for i, e in enumerate(inst_redis.lstException):
+            inst_logger.error(
+                "线程 %s 运行过程中发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+        inst_redis.lstException.clear()
     else:
-        inst_logger.info("线程 %s 注册stream组成功" %("HIKC_data",))
-    # 以上为定制初始化区域           
+        inst_logger.info("线程 %s 注册stream组成功, %s " %("HIKC_data",REST))
+    # 以上为定制初始化区域
     # --------------------    
 
     # 主线程变量初始化：启动变量，退出返回值
@@ -144,12 +150,12 @@ def start_process(config_file):
             # 如有则暂缓退出，如没有立即退出
             
             inst_redis.xdelgroup("stream_test", "HIKC_data")
-            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
             for i, e in enumerate(inst_redis.lstException):
                 inst_logger.error(
                     "线程 %s 受控退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
                     % (__prc_name__,e['module'], e['timestamp'], e['msg']))
             inst_redis.lstException.clear()
+            inst_logger.info("线程 %s 删除stream组 %s 成功" % (__prc_name__, "HIKC_data"))
             int_exit_code = 2
             break
     

@@ -45,12 +45,17 @@ def start_process(config_file):
     
     # --------------------    
     # 以下为定制初始化区域
-    
-    if not inst_redis.xcreategroup("stream_reading_confirm", "ReadingConfirm"):
-        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("ReadingConfirm",))
+    REST = inst_redis.xcreategroup("stream_reading_confirm", "ReadingConfirm")
+    if REST :   # 返回值不为空，说明异常信息
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在， %s " %("ReadingConfirm", REST))
+        for i, e in enumerate(inst_redis.lstException):
+            inst_logger.error(
+                "线程 %s 运行过程中发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+        inst_redis.lstException.clear()
     else:
-        inst_logger.info("线程 %s 注册stream组成功" %("ReadingConfirm",))
-    
+        inst_logger.info("线程 %s 注册stream组成功, %s " %("ReadingConfirm",REST))
+
     b_thread_running = True
     int_exit_code = 0
     
@@ -108,7 +113,8 @@ def start_process(config_file):
         prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
         if prc_run_lock is None:  
             # --------------------
-            # 以下为定制区域，用于中止线程内创建的线程或调用的函数            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            # 以下为定制区域，用于中止线程内创建的线程或调用的函数            
+            inst_redis.xdelgroup("stream_test", "HIKC_data")
             for i, e in enumerate(inst_redis.lstException):
                 inst_logger.error(
                     "线程 %s 超时退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
@@ -126,13 +132,13 @@ def start_process(config_file):
         if prc_run_lock == "exit":
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
-            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            inst_redis.xdelgroup("stream_reading_confirm", "ReadingConfirm")
             for i, e in enumerate(inst_redis.lstException):
                 inst_logger.error(
                     "线程 %s 超时退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
                     % (__prc_name__,e['module'], e['timestamp'], e['msg']))
             inst_redis.lstException.clear()
-            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
+            inst_logger.info("线程 %s 删除stream组 %s 成功" %(__prc_name__,"ReadingConfirm"))
 
             int_exit_code = 2          
             break
