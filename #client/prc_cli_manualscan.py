@@ -83,6 +83,10 @@ def start_process(config_file,__cli_id__):
         # 取得QT窗口拦截的键盘输入，即扫描枪扫描数据
         strManualScanBarcode = inst_redis.getkey(f"manualscan:cli{__cli_id__:02}_qt:input")
         #strManualScanBarcode = inst_redis.getkey(f"manualscan:cli00_qt:input")
+        lst_reading_nr = list(inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
+        set_reading_mr = inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
+        if len(lst_reading_nr) + len(set_reading_mr) == 0:  # 正常状态，不需要补码
+            continue
         if strManualScanBarcode:        # 如果接收缓冲区不为空
             inst_logger.info(f"收到QT传来的补码条码：$${strManualScanBarcode}$$")
             inst_redis.setkey(f"manualscan:cli{__cli_id__:02}_qt:input", "")    # 清空缓冲区

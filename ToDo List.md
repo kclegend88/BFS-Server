@@ -2,9 +2,13 @@
 
 ### Important
 
-- [ ] prc_monitor: check all prc status and restart thread if nessecary
+- [x] prc_monitor: check all prc status and restart thread if nessecary
 
-- [ ] exit cleanup: before main() close, clean sys: ready in redis, and all streams 
+- [x] exit cleanup: before main() close, clean sys: ready in redis, and all streams 
+
+- [ ] create error code for logging ,unique code can easy find from source code.
+
+- [ ] move all process basic function to top
 
 - [ ] xadd or file-io, save logger info, sync to DSS database or write into local path. 
 
@@ -14,7 +18,7 @@
 
 - [ ] plc connection fault -- alarm and stop
 
-- [ ] client id and group id conflict
+- [x] client id and group id conflict
 
 ### Urgent
 
@@ -30,7 +34,7 @@
 
 - [ ] fRedis setkey, after upgrade to Redis 6.2, before set value to buf, compare return value of set redis old data( set(key, get=true) ), to avoid async of the buf and redis
 
-- [ ] main.py startup, after start all thread, count how many runlock online, compare to thread counter to figure out, the startup proceed is doing well or not . 
+- [x] main.py startup, after start all thread, count how many runlock online, compare to thread counter to figure out, the startup proceed is doing well or not . 
 
 - [ ] cli_template, entrance with cli_id, independent redis connection
 
@@ -42,6 +46,6 @@
 
 - [ ] log level test, log rotation test, copy rotated log to syncthing file path;
 
-- [ ] plc_conv, data_type replan, no need: is lock, avoid continue start-stop
+- [x] plc_conv, data_type replan, no need: is lock, avoid continue start-stop
 
 - [ ] All stream change to read-ack loop, check pending when restart;

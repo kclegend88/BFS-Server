@@ -184,7 +184,7 @@ Update stmReadingConfirm from template 2.0-->3.0
 
 Add cli_qt, show parcel position and list, testing
 
-# Rev 0.3.2
+# Rev 0.3.3
 Update main_cli, add lst_thread, add exit code, add prc join, send syc:cli<xx>:comannd by "exit“ and clean sys：cli<xx>:ready
 
 Update cli_ms to template 0.3, fix can not exit bug, add exit code and delete xgroup
@@ -193,3 +193,12 @@ fix some group name fault
 
 Add function for parcel position shown, on cli_qt
 
+# Rev 0.4.0
+Add stmHIKC_file, update main_cli_qt, Client show picture on the screen.direction and sequence config by ini file.
+
+Update cli_ms, if set_reading_mr/nr is empty, do nothing.
+	Maybe some bug, rest sentence will never run...
+
+Temporary disable len = 0 clause in playsound. some bug may happen.
+
+Dec stmHIKC_data CT from 1000 to 300,speed up to match high throughput

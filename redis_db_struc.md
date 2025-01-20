@@ -48,6 +48,8 @@ stream_test                        # 测试用stream
                                 ['result']    :读码结果 GR/MR/NR
                                 ['pos_x']    :输送方向坐标，从RGBD原点开始计算，发送报文应为1700左右 
                                 ['pos_y']    :宽度方向坐标，从RGBD 原点开始计算，前进右侧为正
+			group: HIKC, prc: stmHIKC_data, client : HIKC_data-id01
+			group: cli<xx>_playsound, prc: cli_playsound, client : cliplay-id01		
 stream_buf                        # 调试用stream
                                 ['buf'] = 'read'
                                 ['data'] = b''    : recv_buf中收到的数据
@@ -58,9 +60,11 @@ stream_reading_confirm            # 已经确认的条码
                                 ['scan_result']        :读取结果，GR/MR_MS/NR_MS
                                 ['check_result']    :检查结果，OK/RC/BL/OP/NF/SF
                                 ['remark']            :用来存补码的过程的，包括cli_id, scan_id 等;
+			group: ReadingConfirm, prc:stmReadingConfirm, client :ReadingConfirm-DB01
 
 stream_manualscan                # 测试用stream 
                                 ['cli_id']    :客户端编号
                                 ['scan_id']    :扫描编号 
                                 ['barcode']    :条码
                                 ['type']    :MR/NR
+			group: manualscan, prc: stmManualScan, client: manualscan-id01

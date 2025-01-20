@@ -19,6 +19,7 @@ from prc_stmHIKC_data import start_process as start_stmHIKC_data
 from prc_stmManualScan import start_process as start_stmManualScan
 from prc_stmReadingConfirm import start_process as start_stmReadingConfirm
 from prc_monitor_new import start_process as start_monitor
+from prc_stmHIKC_file import start_process as start_stmHIKC_file
 
 class main:
     def __init__(self):
@@ -26,7 +27,8 @@ class main:
         self.__version__='0.1.0'
         self.status = 127       # 初创建 状态为 127
         # 定义线程总表，所有在该表格中的线程由main启动并监控
-        self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan","PLC"]
+        self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan","PLC", "stmHIKC_file"]
+        #self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan","PLC"]
 #        self.lst_thread_name = ["stmHIKC_data","stmReadingConfirm","stmManualScan"]
         
 

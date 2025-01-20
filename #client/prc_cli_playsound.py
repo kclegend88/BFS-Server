@@ -93,8 +93,8 @@ def start_process(config_file,__cli_id__):
         lst_reading_nr = list(inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
         set_reading_mr = inst_redis.getset("set_reading_mr")        # 更新set_reading_mr
         l = inst_redis.xreadgroup("stream_test",__prc_name__,"cliplay-id01")
-        if len(lst_reading_nr) + len(set_reading_mr) == 0:          # 正常状态，读取 stream_test, 每收到一个gr 播放一个声音l
-            if len(l)>0:                                # 收到消息
+        #if len(lst_reading_nr) + len(set_reading_mr) == 0:          # 正常状态，读取 stream_test, 每收到一个gr 播放一个声音l
+        if len(l)>0:                                # 收到消息
                 inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
                 for i,dictdata in l[0][1]:              # 遍历收到的所有消息
                     if dictdata['result']=='GR':        # 正常识读
