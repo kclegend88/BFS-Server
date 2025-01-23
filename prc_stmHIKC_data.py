@@ -27,6 +27,8 @@ def start_process(config_file):
                 # Only for debug
                 inst_logger.debug("读取结果 %s, 条码 %s, " %(dictdata['result'],dictdata['code']))        
                 # Only for debug
+                # check barcode, if ng, slow down conv, add to set_reading_ng
+                # add to barcode check stm,
 
                 # prc_stmhikc_barcodecheck(dictdata['code'])
             elif dictdata['result']=='MR':                                          # 多条码
@@ -54,6 +56,13 @@ def start_process(config_file):
                     inst_logger.info("发送减速信号autoslowdown，条码读取异常，NR")                      
                     inst_redis.setkey(f"plc_conv:command","autoslowdown")            # slow down conv
             #inst_redis.ACK("stream_test",i)
+            #inst_redis.ACK("stream_test",i)
+            elif dictdata['result']=='MS_AS':      # 异常停止时增加的条码
+                inst_redis.setkey(f"parcel:barcode:{dictdata['uid']}", dictdata['code'])  # uid对应的包裹，正确补的出来的条码 
+                inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}", 'MS_AS')  # uid对应的包裹，扫描结果 GR 
+                inst_redis.sadd("set_reading_gr", dictdata['code'])  # GR的包裹，将条码加入set_reading_gr
+                # Only for debug
+                inst_logger.debug("异常停线时添加读取结果 %s, 条码 %s, " % (dictdata['result'], dictdata['code']))
     __prc_name__="stmHIKC_data"             
     
     ini_config = clsConfig(config_file)     # 来自主线程的配置文件

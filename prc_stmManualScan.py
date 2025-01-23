@@ -47,6 +47,7 @@ def start_process(config_file):
         for i,parcel_uid in enumerate(lst_reading_nr):
             inst_redis.setkey(f"parcel:scan_result:{parcel_uid}","NR_MS")
             inst_redis.setkey(f"parcel:barcode:{parcel_uid}",lst_ms_nr[i])
+            inst_redis.sadd("set_reading_gr", lst_ms_nr[i])  # 将条码加入set_reading_gr
             inst_logger.info("包裹补码成功,线程 %s 修改NR包裹状态 uid= %s, barcode =%s"%(__prc_name__,parcel_uid,lst_ms_nr[i]))
         inst_redis.clearset("set_ms_nr")
         inst_redis.clearset("set_reading_nr")
@@ -55,6 +56,7 @@ def start_process(config_file):
             parcel_uid = inst_redis.getkey(f"parcel:ms_barcode:{parcel_barcode}")
             inst_redis.setkey(f"parcel:scan_result:{parcel_uid}","MR_MS")
             inst_redis.setkey(f"parcel:barcode:{parcel_uid}",parcel_barcode)
+            inst_redis.sadd("set_reading_gr", parcel_barcode)  # 将条码加入set_reading_gr
             inst_logger.info("包裹补码成功,线程 %s 修改MR包裹状态 uid= %s, barcode =%s"%(__prc_name__,parcel_uid,parcel_barcode))
         inst_redis.clearset("set_ms_mr")       
         inst_redis.clearset("set_reading_mr")

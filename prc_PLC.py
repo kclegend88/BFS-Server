@@ -164,7 +164,7 @@ def start_process(config_file):
             str_result = inst_redis.getkey(f"parcel:scan_result:{str_uid}")
             str_barcode = inst_redis.getkey(f"parcel:barcode:{str_uid}")
 
-            if not str_result in ['GR','MR_MS','NR_MS']:    # 有异常包裹流出
+            if not str_result in ['GR','MR_MS','NR_MS','MS_AS']:    # 有异常包裹流出
                inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}") 
                # 发送停线指令
                # prc_PLC_autostop() 

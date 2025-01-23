@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 sys.path.append("..")
+sys.path.append("include")
 import json
 import time
 import traceback
