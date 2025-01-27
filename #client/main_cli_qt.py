@@ -58,7 +58,7 @@ class BarcodeDisplay(QWidget):
             # 创建数据流组
             self.stream_name_create = "stream_test"
             self.stream_name_delete = "stream_reading_confirm"
-            self.inst_logger.info("线程 %s 注册stream组成功" % (__prc_name__,))
+            # self.inst_logger.info("线程 %s 注册stream组成功" % (__prc_name__,))
             self.uid_deque = deque()  # 用来存储uid
             self.exception_list = []  # 存储异常时扫入的条码
             self.nofound_list = []
@@ -66,32 +66,48 @@ class BarcodeDisplay(QWidget):
             self.exception_handling = 0
             try:
                 inst_redis.xcreategroup(self.stream_name_create, self.__prc_name__)
-                inst_logger.info("线程 %s 注册stream组成功" % (__prc_name__,))
+                inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__,self.stream_name_create))
             except Exception as e:
-                inst_logger.info("线程 %s 注册stream组失败，该组已存在" % (__prc_name__,))
+                inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__,self.stream_name_create))
             try:
                 inst_redis.xcreategroup(self.stream_name_delete, self.__prc_name__)
-                inst_logger.info("线程 %s 注册stream组成功" % (__prc_name__,))
+                inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__,self.stream_name_delete))
             except Exception as e:
-                inst_logger.info("线程 %s 注册stream组失败，该组已存在" % (__prc_name__,))
+                inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__,self.stream_name_delete))
             self.init_ui()
 
         def addImageToFrame(self, frame_name, i, barcode):
             # 使用对象名找到相应的 QFrame
+            frame = self.findChild(QFrame, frame_name)
+            if not frame:
+                self.inst_logger.info(f"未找到名为 {frame_name} 的 QFrame")
+                return
 
+            # 加载图片
             image = QPixmap(f"{i}")  # i 是图片的路径
-            pixmap = image.scaled(600, 500, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            if self.pic_rotate == 1:
-                # 创建 QTransform 对象用于旋转 180 度
-                transform = QTransform()
-                transform.rotate(180)  # 旋转 180 度
+            if image.isNull():
+                self.inst_logger.info(f"图片路径 {i} 无效")
+                return
 
-                # 使用 QMatrix 对象来变换 QPixmap
-                rotated_pixmap = pixmap.transformed(transform, Qt.SmoothTransformation)
-                # 在 QPixmap 上绘制条形码
-                painter = QPainter(rotated_pixmap)
-            else:
-                painter = QPainter(pixmap)
+            # 缩放图片
+            pixmap = image.scaled(600, 500, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+            # 如果需要旋转图片
+            if self.pic_rotate == 1:
+                try:
+                    self.inst_logger.info("图片开始旋转")
+                    # 创建 QTransform 对象用于旋转 180 度
+                    transform = QTransform()
+                    transform.rotate(180)  # 旋转 180 度
+
+                    # 使用 QMatrix 对象来变换 QPixmap
+                    rotated_pixmap = pixmap.transformed(transform, Qt.SmoothTransformation)
+                    pixmap = rotated_pixmap  # 更新 pixmap 为旋转后的图片
+                except Exception as e:
+                    self.inst_logger.info(f"旋转失败: {e}")
+
+            # 在 QPixmap 上绘制条形码
+            painter = QPainter(pixmap)
             painter.setRenderHint(QPainter.Antialiasing)
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
@@ -106,12 +122,13 @@ class BarcodeDisplay(QWidget):
             # 结束绘制
             painter.end()
 
-            # 获取到对应的 QFrame，并更新 QLabel 显示的图片
-            frame = self.findChild(QFrame, frame_name)
-            if frame:
-                label = frame.layout().itemAt(0).widget()  # 获取到 QLabel
+            # 获取到对应的 QLabel，并更新显示的图片
+            label = frame.layout().itemAt(0).widget()  # 获取到 QLabel
+            if label:
                 label.setText("")  # 清空原先的文本
                 label.setPixmap(pixmap)  # 显示包含条形码文本的图片
+            else:
+                self.inst_logger.info(f"未找到 {frame_name} 中的 QLabel")
 
         def init_ui(self):
             # 创建主布局 横线布局
@@ -125,15 +142,20 @@ class BarcodeDisplay(QWidget):
             self.setWindowTitle("接收条码")
             self.setGeometry(100, 100, 300, 200)
 
-            self.label = QLabel("MAWB：\nHAWB:", self)
-            self.label1 = QLabel("30", self)
+            self.MAWB = QLabel("MAWB:", self)
+            self.HAWB = QLabel("HAWB:", self)
 
-            self.label.setFont(font)
-            self.label1.setFont(font)
-            # 创建接收条码布局
-            self.labelLayout = QHBoxLayout()
-            self.labelLayout.addWidget(self.label, 1)
-            self.labelLayout.addWidget(self.label1, 9)
+            self.MAWB.setFont(font)
+            self.HAWB.setFont(font)
+
+            # 创建MAWB布局，HAWB布局
+            self.MAWBLayout = QHBoxLayout()
+            self.MAWBLayout.addWidget(self.MAWB)
+            self.HAWBLayout = QHBoxLayout()
+            self.HAWBLayout.addWidget(self.HAWB)
+            # 创建HAWBinfo
+            self.HAWBinfo = QGridLayout()
+            self.HAWBinfocreate()
             # 创建左侧图片布局
             self.pic_layout = QHBoxLayout()
             self.picCreate()
@@ -161,14 +183,27 @@ class BarcodeDisplay(QWidget):
             # 隐藏控件
             self.input.hide()
             self.btn_submit.hide()
-            # 创建显示标签
-            self.showdata = QLabel("当前NR数量为：**，MR数量为：**", self)
-            self.showdata.setFont(font)
+
+            # 创建一个网格布局
+            self.showdatagridlayout = QGridLayout()
+            self.showdatavreate()
+            # 添加分割线
+            line = QFrame()
+            line.setFrameShape(QFrame.HLine)  # 设置为垂直分割线
+            line.setFrameShadow(QFrame.Sunken)  # 设置阴影效果
+            # 添加分割线
+            line1 = QFrame()
+            line1.setFrameShape(QFrame.HLine)  # 设置为垂直分割线
+            line1.setFrameShadow(QFrame.Sunken)  # 设置阴影效果
             # self.btn_submit.setFixedSize(100, 40)  # 设置按钮大小
-            #self.btn_submit.clicked.connect(self.submit_clicked)
+            # self.btn_submit.clicked.connect(self.submit_clicked)
             leftlayout.addLayout(self.pic_layout, 6)
-            leftlayout.addLayout(self.labelLayout, 1)  # 设置比例31112
-            leftlayout.addWidget(self.showdata, 1)
+            leftlayout.addLayout(self.MAWBLayout, 1)  # 设置比例31112
+            leftlayout.addWidget(line)
+            leftlayout.addLayout(self.HAWBLayout, 1)  #
+            leftlayout.addLayout(self.HAWBinfo, 1)  #
+            leftlayout.addWidget(line1)
+            leftlayout.addLayout(self.showdatagridlayout, 1)
             leftlayout.addWidget(self.input, 1)
             leftlayout.addWidget(self.btn_submit, 1)
             leftlayout.addLayout(self.pidaiji_layout, 2)
@@ -205,7 +240,7 @@ class BarcodeDisplay(QWidget):
             self.setFocus()
 
         def update_barcode(self, strManualScanBarcode):
-            #self.label.setText(f"接收到的条码：{strManualScanBarcode}")
+            # self.label.setText(f"接收到的条码：{strManualScanBarcode}")
             # 条码存入redis  __cli_id__  manualscan:cli_01:input
             self.inst_redis.setkey(f"manualscan:{self.__prc_name__}:input", f"{strManualScanBarcode}")
 
@@ -230,7 +265,7 @@ class BarcodeDisplay(QWidget):
                             self.inst_logger.info("扫到特殊条码，结束异常模式")
                             # 判断异常条码列表有多少个，获取nr有多少个，mr有多少个
                             lst_reading_nr = list(self.inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
-                            #set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
+                            # set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
                             set_reading_gr = self.inst_redis.getset("set_reading_gr")
                             self.inst_logger.info(f"异常条码为：{self.nofound_list}")
                             self.inst_logger.info(f"补入的所有条码为：{self.exception_list}")
@@ -249,6 +284,7 @@ class BarcodeDisplay(QWidget):
                                     lst_reading_mr.append(self.inst_redis.getkey(f"parcel:barcode:{parts[2]}"))
                             self.inst_logger.info(f"redis中Noread条码为：{lst_reading_nr}，Mrread条码为：{lst_reading_mr}")
                             self.inst_logger.info(f"parcel中所有MR的条码为：{lst_reading_mr}")
+                            tail = 0
                             for mr in lst_reading_mr:
                                 if mr in outCV3barcode:
                                     self.inst_logger.info(f"扫入的条码存在mr：{mr}中，将mr放入待提交列表")
@@ -258,19 +294,26 @@ class BarcodeDisplay(QWidget):
                                 else:
                                     # 删除错的或者多余的redis里的mr
                                     mr_uid = self.inst_redis.getkey(f"parcel:ms_barcode:{mr}")
+                                    # 把mr_uid最后一位换成tail
+                                    mr_uid = mr_uid[:-1] + str(tail)
+                                    self.inst_logger.info(f"需要删除的mr_uid为：{mr_uid}")
                                     # 根据uid进行删除barcode posx posy sid scan_result
+                                    self.inst_logger.info(f"{mr}不在扫入的条码中，为错码或者重复码，在parcel中进行删除")
                                     self.inst_redis.clearparcelkey(f"parcel:barcode:{mr_uid}")
                                     self.inst_redis.clearparcelkey(f"parcel:posx:{mr_uid}")
                                     self.inst_redis.clearparcelkey(f"parcel:posy:{mr_uid}")
                                     self.inst_redis.clearparcelkey(f"parcel:scan_result:{mr_uid}")
+                                    self.inst_redis.clearparcelkey(f"parcel:sid:{mr_uid}")
                                     try:
-                                        self.uid_deque.remove(mr_uid)
+                                        self.inst_logger.info(f"将{mr_uid}移除遍历队列")
+                                        self.uid_deque.remove(mr_uid)  # 移除队列
                                     except Exception as e:
                                         self.inst_logger.info(traceback.format_exc())
-                                    self.inst_logger.info(f"{mr}不在扫入的条码中，为错码，进行parcel中删除")
+                                    # self.inst_logger.info(f"{mr}不在扫入的条码中，为错码，进行parcel中删除")
                                     # 去掉set_reading_mr中对应的mr
-                                    #self.inst_redis.clearsetvalue('set_reading_mr', mr)
-                                    self.inst_logger.info(f"{mr}不在扫入的条码中，为错码或者重复码，在parcel中进行删除")
+                                    # self.inst_redis.clearsetvalue('set_reading_mr', mr)
+
+                                    tail = tail + 1
                             # outCV3barcode 中剩余的数量与redis中的nr做对比，如果数量相等，将所有的条码加入到wait_list
                             self.inst_logger.info(f"处理完mr后，剩下的条码为：{outCV3barcode}")
                             if len(outCV3barcode) == len(lst_reading_nr):
@@ -315,10 +358,15 @@ class BarcodeDisplay(QWidget):
                                             self.uid_deque.remove(parts[2])
                                         except:
                                             self.inst_logger.info(traceback.format_exc())
+                                        result = self.inst_redis.clearsetvalue('set_reading_nr', parts[2])
+                                        if result == 1:
+                                            self.inst_logger.info(f"{parts[2]}在set_reading_nr中删除成功")
+                                        else:
+                                            self.inst_logger.info(f"{parts[2]}在set_reading_nr中删除失败")
                                         x = x - 1
                                         if x <= 0:
                                             break
-                                self.inst_redis.set
+
                             # 处理完成后将wait_list中的条码放到redis中，并且清空wait_list
                             for i in wait_list:
                                 while True:
@@ -327,6 +375,7 @@ class BarcodeDisplay(QWidget):
                                         self.inst_redis.setkey(f"manualscan:{self.__prc_name__}:input", f"{i}")
                                         self.inst_logger.info(f"提交给munulscan处理中：{i}")
                                         break
+                            time.sleep(1)
                             self.exception_handling = 0
                             self.nofound_list = []
                             self.exception_list = []
@@ -344,7 +393,7 @@ class BarcodeDisplay(QWidget):
                                         # 如果遍历完 self.results 后发现 self.barcode_input 不在其中
                                     if not found:
                                         self.nofound_list.append(self.barcode_input)  # 将 self.barcode_input 添
-                                    #self.label1.setText(f"未出现过的条码：{self.nofound_list}")
+                                    # self.label1.setText(f"未出现过的条码：{self.nofound_list}")
                                     self.exception_list.append(self.barcode_input)
                                     print(self.exception_list)
                                     self.inst_logger.info(f"扫入条码exception_list为：[]")
@@ -352,7 +401,7 @@ class BarcodeDisplay(QWidget):
                             self.update_barcode(self.barcode_input)
                             self.scanbarcode = self.barcode_input
                             self.barcode_input = ""  # 清空当前条码
-                        #self.label.setText(f"接收到的条码：{self.barcode_input}")
+                        # self.label.setText(f"接收到的条码：{self.barcode_input}")
                         self.scanbarcode = self.barcode_input
                         self.barcode_input = ""  # 清空当前条码
                 else:
@@ -506,6 +555,9 @@ class BarcodeDisplay(QWidget):
                 posx_value = self.inst_redis.getkey(posx_key)
                 posy_value = self.inst_redis.getkey(posy_key)
                 scan_result_value = self.inst_redis.getkey(scan_result_key)
+                if barcode_value == None and posx_value == None and posy_value == None and scan_result_value == None:
+                    self.uid_deque.remove(key)
+                    continue
                 # 将值放入列表中
                 self.results.append({
                     'barcode': barcode_value,
@@ -641,12 +693,15 @@ class BarcodeDisplay(QWidget):
                                 continue
                             # 添加uid到队列中
                             self.uid_deque.append(uid)
-                      
+
                             # 先找到图片
                             # 查找包含uid的图片
                             if result == 'GR':
                                 # 全部显示功能开关
-                                if not self.all_show_flag:
+                                if not self.all_show_flag:  # 如果皮带机不处于正常，就不显示GR
+                                    continue
+                                plc_status = self.inst_redis.getkey('plc_conv:fullspeed')
+                                if plc_status != 'yes':
                                     continue
                                 path = self.AITarget_file_path
                                 ftp_path = self.ftp_path_Alread
@@ -804,13 +859,150 @@ class BarcodeDisplay(QWidget):
         self.exception_list = []
         self.nofound_list = []
         self.inst_logger.info("清除扫入条码列表和未出现的列表")
-        #self.label1.setText("未出现过的条码：")
+        # self.label1.setText("未出现过的条码：")
         self.barcode_input = ""  # 清空当前条码
 
     def control_update(self):
         lst_reading_nr = list(self.inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
         set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
-        self.showdata.setText(f"当前NR数量为：{len(lst_reading_nr)}，MR数量为：{len(set_reading_mr)}")
+        self.NR.setText(f"NR:{len(lst_reading_nr)}")
+        self.MR.setText(f"MR:{len(set_reading_mr)}")
+        # for i in range(len(lst_reading_nr)):
+        #     if i == 0:
+        #         self.NR_1.setText(f"{lst_reading_nr[0]}")
+        #         continue
+        #     if i == 1:
+        #         self.NR_2.setText(f"{lst_reading_nr[1]}")
+        #         continue
+        #     if i == 2:
+        #         self.NR_3.setText(f"{lst_reading_nr[2]}")
+        #         continue
+        # set_reading_mr = list(set_reading_mr)  # 将集合转换为列表
+        # for i in range(len(set_reading_mr)):
+        #     if i == 0:
+        #         self.MR_1.setText(f"{set_reading_mr[0]}")
+        #         continue
+        #     if i == 1:
+        #         self.MR_2.setText(f"{set_reading_mr[1]}")
+        #         continue
+        #     if i == 2:
+        #         self.MR_3.setText(f"{set_reading_mr[2]}")
+        #         continue
+
+    def showdatavreate(self):
+        # 创建网格布局
+        # 创建控件
+        font = QtGui.QFont()
+        font.setPointSize(20)
+        font.setBold(True)
+        font1 = QtGui.QFont()
+        font1.setPointSize(15)
+        palette = QPalette()
+        self.NR = QLabel("NR:")
+        # 创建调色板对象
+
+        # 设置背景颜色为你需要的颜色（例如，红色）
+        # palette.setColor(QPalette.Background, QColor(255, 0, 0))  # 红色
+        # self.NR.setAutoFillBackground(True)  # 使背景填充生效
+        # 应用调色板
+        # self.NR.setPalette(palette)
+        self.MR = QLabel("MR:")
+        # self.MR.setAutoFillBackground(True)  # 使背景填充生效
+        # 应用调色板
+        # self.MR.setPalette(palette)
+        self.NG = QLabel("NG:")
+        # 设置文本居中
+        self.NR.setAlignment(Qt.AlignCenter)
+        self.MR.setAlignment(Qt.AlignCenter)
+        self.NG.setAlignment(Qt.AlignCenter)
+
+
+        self.NR_1 = QLabel("xx")
+        self.NR_2 = QLabel("xx")
+        self.NR_3 = QLabel("xx")
+        self.MR_1 = QLabel("xx")
+        self.MR_2 = QLabel("xx")
+        self.MR_3 = QLabel("xx")
+        self.NG_1 = QLabel("xx")
+        self.NG_2 = QLabel("xx")
+        self.NG_3 = QLabel("xx")
+
+        self.NR_1.setAlignment(Qt.AlignCenter)
+        self.NR_2.setAlignment(Qt.AlignCenter)
+        self.NR_3.setAlignment(Qt.AlignCenter)
+        self.MR_1.setAlignment(Qt.AlignCenter)
+        self.MR_2.setAlignment(Qt.AlignCenter)
+        self.MR_3.setAlignment(Qt.AlignCenter)
+        self.NG_1.setAlignment(Qt.AlignCenter)
+        self.NG_2.setAlignment(Qt.AlignCenter)
+        self.NG_3.setAlignment(Qt.AlignCenter)
+
+        self.NR.setFont(font)
+        self.MR.setFont(font)
+        self.NG.setFont(font)
+        self.NR_1.setFont(font1)
+        self.NR_2.setFont(font1)
+        self.NR_3.setFont(font1)
+        self.MR_1.setFont(font1)
+        self.MR_2.setFont(font1)
+        self.MR_3.setFont(font1)
+        self.NG_1.setFont(font1)
+        self.NG_2.setFont(font1)
+        self.NG_3.setFont(font1)
+
+        # 将控件添加到布局中，指定控件的行列位置
+        self.showdatagridlayout.addWidget(self.NR, 0, 0)  # 行0列0
+        self.showdatagridlayout.addWidget(self.MR, 0, 1)  # 行0列1
+        self.showdatagridlayout.addWidget(self.NG, 0, 2)  # 行0列2
+        self.showdatagridlayout.addWidget(self.NR_1, 1, 0)  # 行1列0
+        self.showdatagridlayout.addWidget(self.NR_2, 2, 0)  # 行2列0
+        self.showdatagridlayout.addWidget(self.NR_3, 3, 0)  # 行3列1
+        self.showdatagridlayout.addWidget(self.MR_1, 1, 1)  # 行1列0
+        self.showdatagridlayout.addWidget(self.MR_2, 2, 1)  # 行2列0
+        self.showdatagridlayout.addWidget(self.MR_3, 3, 1)  # 行3列1
+        self.showdatagridlayout.addWidget(self.NG_1, 1, 2)  # 行1列0
+        self.showdatagridlayout.addWidget(self.NG_2, 2, 2)  # 行2列0
+        self.showdatagridlayout.addWidget(self.NG_3, 3, 2)  # 行3列1
+
+    def HAWBinfocreate(self):
+        font = QtGui.QFont()
+        font.setPointSize(20)
+        font1 = QtGui.QFont()
+        font1.setPointSize(15)
+        font.setBold(True)
+        self.total = QLabel("Total")
+        self.hpk = QLabel("HPK")
+        self.out = QLabel("OUT")
+        self.total_number = QLabel("143")
+        self.hpk_number = QLabel("xxx")
+        self.out_number = QLabel("xxx")
+        self.total.setFont(font)
+        self.hpk.setFont(font)
+        self.out.setFont(font)
+        self.total_number.setFont(font1)
+        self.hpk_number.setFont(font1)
+        self.out_number.setFont(font1)
+        # 设置文本居中
+        self.total.setAlignment(Qt.AlignCenter)
+        self.hpk.setAlignment(Qt.AlignCenter)
+        self.out.setAlignment(Qt.AlignCenter)
+        self.total_number.setAlignment(Qt.AlignCenter)
+        self.hpk_number.setAlignment(Qt.AlignCenter)
+        self.out_number.setAlignment(Qt.AlignCenter)
+
+        self.HAWBinfo.addWidget(self.total, 0, 0)
+        self.HAWBinfo.addWidget(self.hpk, 0, 1)
+        self.HAWBinfo.addWidget(self.out, 0, 2)
+        self.HAWBinfo.addWidget(self.total_number, 1, 0)
+        self.HAWBinfo.addWidget(self.hpk_number, 1, 1)
+        self.HAWBinfo.addWidget(self.out_number, 1, 2)
+    # 添加分割线
+    #     line = QFrame()
+    #     line.setFrameShape(QFrame.HLine)  # 设置为水平分割线
+    #     line.setFrameShadow(QFrame.Sunken)  # 设置分割线的阴影效果
+    #     self.HAWBinfo.addWidget(line, 2, 0, 1, 3)  # 这个方法会让分割线跨越 0 到 2 列
+
+
 def start_process(config_file, __cli_id__):
     __prc_cli_type__ = f"cli_qt"
     __prc_name__ = f"cli%02d_qt" % (__cli_id__,)

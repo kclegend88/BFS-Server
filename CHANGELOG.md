@@ -202,3 +202,16 @@ Update cli_ms, if set_reading_mr/nr is empty, do nothing.
 Temporary disable len = 0 clause in playsound. some bug may happen.
 
 Dec stmHIKC_data CT from 1000 to 300,speed up to match high throughput
+
+# Rev 0.4.1
+Update fBarcode , and barcode_formatcheck_bylist, no test yet
+Add stm_ReadingConfirm_dss, sync data with dss server
+Update prc_PLC, main_cli_qt,stm_HIKC_data, add MS_AS function, manual scan after stop. manually solve stuck issue
+Fix bug of manusal scan, after nr_ms and mr_ms, barcode should add into set_reading_gr
+
+# Rev 0.4.2
+Update cli_qt, ms_as mode, not all test success
+
+
+
+
