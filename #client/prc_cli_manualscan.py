@@ -99,9 +99,14 @@ def start_process(config_file,__cli_id__):
             lst_reading_mr = inst_redis.getset("set_reading_mr")         
 
             # 如果条码开头为"##" 说明该条码为手动输入框输入条码或特殊条码
-            if strManualScanBarcode.startswith("##"):       # 条码破损或其他原因导致的手动输入条码
-                str_special = strManualScanBarcode[2:]      # 取得条码本体
+            if strManualScanBarcode.startswith("*"):       # 条码破损或其他原因导致的手动输入条码
+                str_special = strManualScanBarcode[1:]      # 取得条码本体
                 inst_logger.info(f"识别到该条码为特殊条码,条码信息为：$${str_special}$$")
+
+                if str_special == "clean*":        # 进入清场模式
+                    inst_logger.info(f"识别到清场命令，将系统状态更改为clean")
+                    inst_redis.setkey("sys:status","clean")
+                    continue
 
                 if str_special in lst_reading_gr:           # 如果手动输入的条码属于GR清单,不予接受
                     inst_logger.info("特殊条码已存在于扫描清单中,Barcode is already exist!!")
@@ -112,7 +117,7 @@ def start_process(config_file,__cli_id__):
                 if str_special in lst_reading_mr:           # 如果手动输入的条码属于MR清单,填加至序列等待处理
                     inst_logger.info("Get SPECIAL    MRead Barcode !!")
                     inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':str_special,'type':'MR'})
-                    mixer.music.load(dict_sound['ms_barcode_rescan_accpet'])
+                    mixer.music.load(dict_sound['ms_barcode_rescan_accept'])
                     mixer.music.play()
                     continue
 

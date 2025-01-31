@@ -3,6 +3,14 @@
 	设备主程序运行标志位  
 **sys:device_name**: string
 	设备名称，main.py首次连接redis时写入
+**sys:status**: string
+	设备状态
+	idle:程序启动时默认状态
+	normal:正常状态，输送机全速运行，自动读码
+	alert:警报，输送机低速运行，手动补码至恢复normal状态
+	stop:停止，输送机停止，可继续补码
+	clean:清场，输送机停止后，刷清场码进入该状态，逐个扫描包裹
+	resume:重启，10s启动cv3，之后启动cv2，在此期间如果接收到扫码信息，报错停机	
 **pro_mon:`<prc_name>`:run_lock**: int
 	现场运行锁，该key为空说明无此线程，如该线程为整数说明线程id为该整数的线程正在运行中;
 	每个线程均会判断这个key的状态，一旦发现该key不存在，将立刻终止当前线程
@@ -14,8 +22,10 @@
 	本线程最近一次更新的时间戳，ISO 8601格式记录的字符串
 **pro_mon:`<prc_name>`:command**
 	本线程的通知命令，任何外部线程如向此key写入"exit"，则该线程在完成必要操作后将自行结束线程
-
-plc_conv:command                # start/stop，外部下发给PLC输送机(Conv)的运行命令
+**plc_conv:command**: string 
+	start:	所有输送机全部启动
+	stop: 所有输送机全部停止	
+	外部下发给PLC输送机(Conv)的运行命令
 plc_conv:status                    # pause/run，conv当前的运行状态
 plc_conv:fullspeed                # Yes/Countdown，conv是否全速运行的标志
 plc_conv:CV01:speed                # CV01的速度,0 停止 1低速 2 低中速 3 4 修改redis中状态为高速

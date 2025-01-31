@@ -83,6 +83,9 @@ class main:
         
         self.inst_redis.setkey(f"sys:ready", "true") # 向Redis标注主程序已运行
         self.status = 122  # 实例注册成功，状态为 122
+        # 所有线程启动前，系统进入idle状态
+        self.inst_redis.setkey(f"sys:status","idle")
+        
         # 尝试启动线程
         lst_thread =[]
         try:
@@ -99,7 +102,8 @@ class main:
         except Exception as e:
             self.inst_logger.error ("线程启动失败"+traceback.format_exc())
             sys.exit(122)               # 启动线程时发生异常
-        
+
+
         # 启动监控线程
         self.prc_mon_thread = threading.Thread(target=globals().get("start_monitor"), args=(ini_config,lst_thread),name="start_monitor")
         self.prc_mon_thread.start()
@@ -109,6 +113,8 @@ class main:
             print(th.getName())
 
         time.sleep(3)
+        
+        self.inst_redis.setkey("sys:batchid","0130T01B2")
         while True:
             strInput = input("Type 'Y' and press enter if you want to exit...: ")
             if strInput == 'Y':

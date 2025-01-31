@@ -65,12 +65,13 @@ def start_process(config_file):
     cursor = conn.cursor()
     # 创建订单表格
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS order_info (
+        CREATE TABLE IF NOT EXISTS order_info_ex (
             UID INTEGER PRIMARY KEY AUTOINCREMENT,  -- 编号
             OSN TEXT NOT NULL,  
             TS TEXT,
             SR TEXT,
-            TEST_ID TEXT
+            TEST_ID TEXT,
+            BATCH_ID TEXT
         )
     """)    
     while b_thread_running:
@@ -84,19 +85,30 @@ def start_process(config_file):
         if len(l)>0 :                       # 收到消息
             # print(l)                        # Only for debug
             inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
+            str_batchid=inst_redis.getkey("sys:batchid")
             for i,dictdata in l[0][1]:             # 遍历收到的所有消息
                 try:
-                    cursor.execute('INSERT INTO order_info (OSN,TS,SR,TEST_ID) VALUES (?,?,?,?)',
-                           (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))
+                    cursor.execute('INSERT INTO order_info_ex (OSN,TS,SR,TEST_ID,BATCH_ID) VALUES (?,?,?,?,?)',
+                           (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid'],str_batchid))
                     # Only for debug
                     inst_logger.debug("SQLite DB 写入成功,条码 %s,时间戳 %s,扫描结果 %s, 扫描ID %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))        
                     # Only for debug
+                    inst_redis.sadd("set_reading_confirm", dictdata['barcode'])  # 将条码加入set_reading_confirm
+
                 except sqlite3.IntegrityError:
                     inst_logger.debug("SQLite DB 写入失败！！,条码 %s,时间戳 %s,扫描结果 %s, 扫描ID %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))  
                 
                 finally:
                     conn.commit()
-                
+
+                try:
+                    cursor.execute('SELECT count(*) from order_info_ex where BATCH_ID = ?',(str_batchid,))
+                    count_data = cursor.fetchall()
+                    inst_logger.debug("当前测试 %s 总计包裹 %s"%(str_batchid,count_data[0][0]))
+                    inst_redis.setkey("sys:hawb:count",f"{count_data[0][0]}")
+                except:
+                    inst_logger.debug("SQLite DB 读取计数失败"+traceback.format_exc())
+
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         

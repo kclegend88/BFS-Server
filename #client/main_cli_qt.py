@@ -1,5 +1,6 @@
 # prc_template  v 0.2.0
 import sys
+from symbol import pass_stmt
 
 sys.path.append("include")
 import re
@@ -17,7 +18,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import Qt, QSize, QThread
 from PyQt5.QtGui import QPixmap, QColor, QPainter, QFont, QPalette, QBrush, QTransform
 from PyQt5.QtWidgets import QWidget, QGridLayout, QApplication, QFrame, QLabel, QVBoxLayout, QSplitter, QHBoxLayout, \
-    QTableWidgetItem, QLineEdit, QPushButton, QMessageBox
+    QTableWidgetItem, QLineEdit, QPushButton, QMessageBox,QStatusBar
 
 from fBarcode import barcode_formatcheck
 from fLog import clsLogger
@@ -28,390 +29,381 @@ from pygame import mixer
 
 
 class BarcodeDisplay(QWidget):
-    try:
-        def __init__(self, inst_redis, __cli_id__, inst_logger, __prc_name__, __ini_prc_config__):
-            super().__init__()
-            self.inst_redis = inst_redis
-            self.__cli_id__ = __cli_id__
-            self.inst_logger = inst_logger
-            self.__prc_name__ = __prc_name__
-            # 读取配置文件
-            self.is_image = __ini_prc_config__.qt.image
-            self.level = __ini_prc_config__.qt.level
-            self.pic_direction = __ini_prc_config__.qt.pic_direction
-            self.pic_rotate = __ini_prc_config__.qt.pic_rotate
-            self.all_show_flag = __ini_prc_config__.qt.all_show_flag
-            self.server_ip = __ini_prc_config__.qt.server_ip
-            self.lst_re_exp = []
-            self.lst_re_exp.append(__ini_prc_config__.Barcode.re_exp_01)
-            self.lst_re_exp.append(__ini_prc_config__.Barcode.re_exp_02)
-            # 存储图片位置
-            self.AITarget_file_path = __ini_prc_config__.target_File.AITarget_path
-            self.ErrTarget_path = __ini_prc_config__.target_File.ErrTarget_path
-            self.NoTarget_path = __ini_prc_config__.target_File.NoTarget_path
-            # ftp图片位置
-            self.ftp_path_Alread = __ini_prc_config__.ftp_path.ftp_path_Alread
-            self.ftp_path_Errread = __ini_prc_config__.ftp_path.ftp_path_Errread
-            self.ftp_path_Noread = __ini_prc_config__.ftp_path.ftp_path_Noread
-            self.barcode_input = ""  # 用来存储接收到的条码
+    def __init__(self, inst_redis, __cli_id__, inst_logger, __prc_name__, __ini_prc_config__):
+        super().__init__()
+        self.inst_redis = inst_redis
+        self.__cli_id__ = __cli_id__
+        self.inst_logger = inst_logger
+        self.__prc_name__ = __prc_name__
+        # 读取配置文件
+        self.is_image = __ini_prc_config__.qt.image
+        self.level = __ini_prc_config__.qt.level
+        self.pic_direction = __ini_prc_config__.qt.pic_direction
+        self.pic_rotate = __ini_prc_config__.qt.pic_rotate
+        self.all_show_flag = __ini_prc_config__.qt.all_show_flag
+        self.server_ip = __ini_prc_config__.qt.server_ip
+        self.lst_re_exp = []
+        self.lst_re_exp.append(__ini_prc_config__.Barcode.re_exp_01)
+        self.lst_re_exp.append(__ini_prc_config__.Barcode.re_exp_02)
+        # 存储图片位置
+        self.AITarget_file_path = __ini_prc_config__.target_File.AITarget_path
+        self.ErrTarget_path = __ini_prc_config__.target_File.ErrTarget_path
+        self.NoTarget_path = __ini_prc_config__.target_File.NoTarget_path
+        # ftp图片位置
+        self.ftp_path_Alread = __ini_prc_config__.ftp_path.ftp_path_Alread
+        self.ftp_path_Errread = __ini_prc_config__.ftp_path.ftp_path_Errread
+        self.ftp_path_Noread = __ini_prc_config__.ftp_path.ftp_path_Noread
+        self.barcode_input = ""  # 用来存储接收到的条码
+        self.scanbarcode = ""
+        # 创建数据流组
+        self.stream_name_create = "stream_test"
+        self.stream_name_delete = "stream_reading_confirm"
+        # self.inst_logger.info("线程 %s 注册stream组成功" % (__prc_name__,))
+        self.uid_deque = deque()  # 用来存储uid
+        self.exception_list = []  # 存储异常时扫入的条码
+
+        self.nofound_list = []
+        # 局部初始变量
+        self.exception_handling = 0
+        try:
+            inst_redis.xcreategroup(self.stream_name_create, self.__prc_name__)
+            inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__,self.stream_name_create))
+        except Exception as e:
+            inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__,self.stream_name_create))
+        try:
+            inst_redis.xcreategroup(self.stream_name_delete, self.__prc_name__)
+            inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__,self.stream_name_delete))
+        except Exception as e:
+            inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__,self.stream_name_delete))
+        self.init_ui()
+
+        # 清场模式下 扫描条码的集合已扫描数据集合
+        self.scanned_gr = set()
+        self.scanned_mr = set()
+        self.scanned_nr = set()
+        self.scanned_all = set()
+
+        self.dict_sound = {}
+        self.dict_sound['ms_barcode_reject'] = __ini_prc_config__.Sound.ms_barcode_reject
+        self.dict_sound['ms_barcode_exist'] = __ini_prc_config__.Sound.ms_barcode_exist
+        self.dict_sound['ms_barcode_rescan_accpet'] = __ini_prc_config__.Sound.ms_barcode_rescan_accpet
+
+    def addImageToFrame(self, frame_name, i, barcode):
+        # 使用对象名找到相应的 QFrame
+        frame = self.findChild(QFrame, frame_name)
+        if not frame:
+            self.inst_logger.info(f"未找到名为 {frame_name} 的 QFrame")
+            return
+
+        # 加载图片
+        image = QPixmap(f"{i}")  # i 是图片的路径
+        if image.isNull():
+            self.inst_logger.info(f"图片路径 {i} 无效")
+            return
+
+        # 缩放图片
+        pixmap = image.scaled(600, 500, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+        # 如果需要旋转图片
+        if self.pic_rotate == 1:
+            try:
+                self.inst_logger.info("图片开始旋转")
+                # 创建 QTransform 对象用于旋转 180 度
+                transform = QTransform()
+                transform.rotate(180)  # 旋转 180 度
+
+                # 使用 QMatrix 对象来变换 QPixmap
+                rotated_pixmap = pixmap.transformed(transform, Qt.SmoothTransformation)
+                pixmap = rotated_pixmap  # 更新 pixmap 为旋转后的图片
+            except Exception as e:
+                self.inst_logger.info(f"旋转失败: {e}")
+
+        # 在 QPixmap 上绘制条形码
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+
+        # 设置字体及大小
+        font = QFont("Arial", 20)
+        painter.setFont(font)
+        painter.setPen(Qt.white)  # 设置字体颜色为白色
+
+        # 绘制文本，位置可以根据需求调整
+        painter.drawText(220, 50, barcode)  # 在图片的左上角绘制条形码
+
+        # 结束绘制
+        painter.end()
+
+        # 获取到对应的 QLabel，并更新显示的图片
+        label = frame.layout().itemAt(0).widget()  # 获取到 QLabel
+        if label:
+            label.setText("")  # 清空原先的文本
+            label.setPixmap(pixmap)  # 显示包含条形码文本的图片
+        else:
+            self.inst_logger.info(f"未找到 {frame_name} 中的 QLabel")
+
+    def init_ui(self):
+        # 创建主布局 横线布局
+        main_layout = QHBoxLayout()
+        # 左侧布局为纵向布局  第一个为图片布局，第二个为信息布局
+        leftlayout = QVBoxLayout()
+        # 设置字体大小
+        font = QtGui.QFont()
+        # 设置字体大小
+        font.setPointSize(20)  # 设置字体大小为 20
+        self.setWindowTitle("接收条码")
+        self.setGeometry(100, 100, 300, 200)
+
+        self.statusbar = QStatusBar()
+        self.caps_lock_label = QLabel("Caps Lock : OFF")
+        self.statusbar.addPermanentWidget(self.caps_lock_label)
+
+        #self.pagelabel = QLabel("Current Page : 1")
+        #self.statusbar.addWidget(self.pagelabel)
+
+        self.statusbar.showMessage("Client Start",4000)
+
+        self.MAWB = QLabel("MAWB:", self)
+        self.HAWB = QLabel("HAWB:", self)
+        self.sysstatus = QLabel("status", self)
+
+        self.MAWB.setFont(font)
+        self.HAWB.setFont(font)
+        self.sysstatus.setFont(font)
+
+        # 创建MAWB布局，HAWB布局
+        self.MAWBLayout = QHBoxLayout()
+        self.MAWBLayout.addWidget(self.MAWB)
+        self.MAWBLayout.addWidget(self.sysstatus)
+        self.HAWBLayout = QHBoxLayout()
+        self.HAWBLayout.addWidget(self.HAWB)
+        # 创建HAWBinfo
+        self.HAWBinfo = QGridLayout()
+        self.HAWBinfocreate()
+        # 创建左侧图片布局
+        self.pic_layout = QHBoxLayout()
+        self.picCreate()
+
+        # 创建左侧皮带机布局
+        self.pidaiji_layout = QGridLayout()
+        # 设置水平间距
+        self.pidaiji_layout.setHorizontalSpacing(0)  # 水平间距为 10 像素
+
+        # 设置垂直间距
+        self.pidaiji_layout.setVerticalSpacing(0)  # 垂直间距为 10 像素
+        self.pidaijiCreate()
+        # 设置皮带机布局的背景图片
+
+        #  设置输入框 和一个提交按钮
+        self.input = QLineEdit(self)
+        self.input.setPlaceholderText("输入条码")  # 设置输入框的占位符文本
+        self.input.setObjectName("edit2")
+        # self.input.setFocusPolicy(Qt.NoFocus)
+        # 创建提交按钮
+        self.btn_submit = QPushButton("提交", self)
+        self.btn_submit.setObjectName("submitbutton")
+        self.btn_submit.setIcon(QtGui.QIcon("./pic/submit.png"))
+        self.btn_submit.setIconSize(QtCore.QSize(28, 28))
+        # 隐藏控件
+        self.input.hide()
+        self.btn_submit.hide()
+
+        # 创建一个网格布局
+        self.showdatagridlayout = QGridLayout()
+        self.showdatavreate()
+        # 添加分割线
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)  # 设置为垂直分割线
+        line.setFrameShadow(QFrame.Sunken)  # 设置阴影效果
+        # 添加分割线
+        line1 = QFrame()
+        line1.setFrameShape(QFrame.HLine)  # 设置为垂直分割线
+        line1.setFrameShadow(QFrame.Sunken)  # 设置阴影效果
+        # self.btn_submit.setFixedSize(100, 40)  # 设置按钮大小
+        # self.btn_submit.clicked.connect(self.submit_clicked)
+        leftlayout.addLayout(self.pic_layout, 6)
+        leftlayout.addLayout(self.MAWBLayout, 1)
+        leftlayout.addWidget(line)
+        leftlayout.addLayout(self.HAWBLayout, 1)
+        leftlayout.addLayout(self.HAWBinfo, 1)
+        leftlayout.addWidget(line1)
+        leftlayout.addLayout(self.showdatagridlayout, 1)
+        leftlayout.addWidget(self.input, 1)
+        leftlayout.addWidget(self.btn_submit, 1)
+        leftlayout.addLayout(self.pidaiji_layout, 2)
+        leftlayout.addWidget(self.statusbar,1)
+        leftlayout.setContentsMargins(0, 0, 0, 0)
+
+        # 创建右侧布局 table控件
+        self.table_layout = QHBoxLayout()
+        self.tableCreate()
+        # 设置 QTableWidget 的属性，确保它不抢占焦点
+        self.tableWidget.setFocusPolicy(Qt.NoFocus)
+        # 将左侧布局，table布局加入主布局中
+
+        main_layout.addLayout(leftlayout, 4)
+        main_layout.addLayout(self.table_layout, 2)
+
+        # 设置窗口的布局
+        self.setLayout(main_layout)
+
+        # 开启线程 循环更新表格内容
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_table)
+        self.timer.start(500)
+        style_file = './qss/table.qss'
+        with open(style_file, 'r', encoding='utf-8') as f:
+            self.setStyleSheet(f.read())
+        # 启动一个线程，接收stream数据 并且更新图片
+        thread = threading.Thread(target=self.pic_show)
+        # 设置线程为守护线程
+        thread.daemon = True
+        thread.start()
+        # 最大化
+        self.showMaximized()
+        # self.showFullScreen()
+        self.setFocus()
+
+    def update_barcode(self, strManualScanBarcode):
+        # self.label.setText(f"接收到的条码：{strManualScanBarcode}")
+        # 条码存入redis  __cli_id__  manualscan:cli_01:input
+        self.inst_redis.setkey(f"manualscan:{self.__prc_name__}:input", f"{strManualScanBarcode}")
+
+    def keyPressEvent(self, event):
+        """
+        捕捉键盘按键事件，当用户按下键盘时，更新条码内容。
+        扫码枪通常会将条码数据当作普通键盘输入，按下回车键表示输入结束。
+        """
+        key = event.key()
+        if key != Qt.Key_Return and key != Qt.Key_Enter:    # 不是回车键
+            self.barcode_input += event.text()              # 添加按下的字符到条码输入缓存，返回
+            return
+        if self.barcode_input == "":
+            return
+        str_bc_input = str(self.barcode_input)              # 获取str格式的输入信息
+        self.barcode_input = ""                             # 清空按键输入缓存
+        self.inst_logger.info(f"QT收到的完整输入信息:{str_bc_input}")
+
+        # 判断收到的是条码还是命令，如果不是以*开头，*结尾的，不是命令
+        str_command_input = ""
+        if str_bc_input.startswith("*") and str_bc_input.endswith("*"):
+            str_command_input = str_bc_input[1:-1]
+            self.inst_logger.info(f"收到命令: {str_command_input}")
+        if str_command_input == "enterclean":   # 进入清场模式
+            self.inst_logger.info(f"收到进入清场模式的指令，尝试进入清场模式")
+            if self.exception_handling == 1:    # 已经是清场模式
+                self.inst_logger.info(f"进入清场模式失败，当前已经在清场模式中")
+                return
+            str_sys_status = self.inst_redis.getkey("sys:status")
+            if str_sys_status != "stop":    # 只允许在系统停止的情况下，进入清场模式
+                self.inst_logger.info(f"进入清场模式失败，当前系统在正常运行中")
+                return
+            # 判断 mr nr ng 三个列表，如果三个列表全部为空，不允许进入清场模式
+            set_reading_nr = self.inst_redis.getset("set_reading_nr")  # 更新set_reading_nr
+            set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
+            set_reading_gr = self.inst_redis.getset("set_reading_gr")
+            if len(set_reading_nr)+ len(set_reading_mr) == 0:
+                self.inst_logger.info(f"进入清场模式失败，NR,MR列表为空")
+                return
+
+            # 开始进入清场模式
+            # 向ms 发送清理命令，清理掉所有已扫描的补码信息
+            self.update_barcode(f"*enterclean*")
             self.scanbarcode = ""
-            # 创建数据流组
-            self.stream_name_create = "stream_test"
-            self.stream_name_delete = "stream_reading_confirm"
-            # self.inst_logger.info("线程 %s 注册stream组成功" % (__prc_name__,))
-            self.uid_deque = deque()  # 用来存储uid
-            self.exception_list = []  # 存储异常时扫入的条码
-            self.nofound_list = []
-            # 局部初始变量
+            self.barcode_input = ""  # 清空当前条码
+
+            # 状态值更改
+            self.scanned_mr.clear()
+            self.scanned_nr.clear()
+            self.scanned_mr.clear()
+            self.scanned_all.clear()
+
+            self.exception_handling = 1
+            self.inst_redis.setkey("sys:status","clean")
+            self.inst_logger.info(f"系统进入清场模式")
+            self.show_status("⚠ 系统进入清场模式！", "#FFA500")
+            return
+
+        if str_command_input == "endclean":     # 离开清场模式
+            self.inst_logger.info(f"收到离开清场模式的指令，尝试离开清场模式")
+            if self.exception_handling == 0:    # 当前不是清场模式
+                self.inst_logger.info(f"离开清场模式失败，当前不在清场模式中")
+                return
+            # 如果mr数量不匹配
+            # 如果nr数量不匹配
+            # 如果ng数量不匹配
+            # 向ms发送补码结果，间隔1s
+
+            self.inst_redis.clearset("set_reading_nr")
+            self.inst_redis.clearset("set_reading_mr")
+            self.inst_redis.clearset("set_ms_nr")
+            self.inst_redis.clearset("set_ms_mr")            
+
+            # 状态值更改
             self.exception_handling = 0
-            try:
-                inst_redis.xcreategroup(self.stream_name_create, self.__prc_name__)
-                inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__,self.stream_name_create))
-            except Exception as e:
-                inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__,self.stream_name_create))
-            try:
-                inst_redis.xcreategroup(self.stream_name_delete, self.__prc_name__)
-                inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__,self.stream_name_delete))
-            except Exception as e:
-                inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__,self.stream_name_delete))
-            self.init_ui()
+            self.inst_redis.setkey("sys:status", "resume") # plc 复位输送机，重启
+            self.inst_logger.info(f"系统离开清场模式")
+            self.show_status("系统离开清场模式！", "#87CEEB")
+            self.exception_list.clear()
+            return
 
-        def addImageToFrame(self, frame_name, i, barcode):
-            # 使用对象名找到相应的 QFrame
-            frame = self.findChild(QFrame, frame_name)
-            if not frame:
-                self.inst_logger.info(f"未找到名为 {frame_name} 的 QFrame")
-                return
-
-            # 加载图片
-            image = QPixmap(f"{i}")  # i 是图片的路径
-            if image.isNull():
-                self.inst_logger.info(f"图片路径 {i} 无效")
-                return
-
-            # 缩放图片
-            pixmap = image.scaled(600, 500, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-
-            # 如果需要旋转图片
-            if self.pic_rotate == 1:
-                try:
-                    self.inst_logger.info("图片开始旋转")
-                    # 创建 QTransform 对象用于旋转 180 度
-                    transform = QTransform()
-                    transform.rotate(180)  # 旋转 180 度
-
-                    # 使用 QMatrix 对象来变换 QPixmap
-                    rotated_pixmap = pixmap.transformed(transform, Qt.SmoothTransformation)
-                    pixmap = rotated_pixmap  # 更新 pixmap 为旋转后的图片
-                except Exception as e:
-                    self.inst_logger.info(f"旋转失败: {e}")
-
-            # 在 QPixmap 上绘制条形码
-            painter = QPainter(pixmap)
-            painter.setRenderHint(QPainter.Antialiasing)
-            painter.setRenderHint(QPainter.SmoothPixmapTransform)
-
-            # 设置字体及大小
-            font = QFont("Arial", 20)
-            painter.setFont(font)
-            painter.setPen(Qt.white)  # 设置字体颜色为白色
-
-            # 绘制文本，位置可以根据需求调整
-            painter.drawText(220, 50, barcode)  # 在图片的左上角绘制条形码
-
-            # 结束绘制
-            painter.end()
-
-            # 获取到对应的 QLabel，并更新显示的图片
-            label = frame.layout().itemAt(0).widget()  # 获取到 QLabel
-            if label:
-                label.setText("")  # 清空原先的文本
-                label.setPixmap(pixmap)  # 显示包含条形码文本的图片
+        if not str_command_input:       # 收到的是条码
+            if self.exception_handling != 1 :       # 正常补码模式，条码发送给ms线程即可
+                self.update_barcode(str_bc_input)   # update redis，传递补码信息给ms线程
+                self.scanbarcode = str_bc_input     # 传递条码信息给定时更新程序 update_table
+                self.show_status(f"✅ 收到条码，{str_bc_input}", "#90EE90")
             else:
-                self.inst_logger.info(f"未找到 {frame_name} 中的 QLabel")
+                # clean 模式，表格更新、状态显示、声音播放都需要自己处理
+                try:
+                    # 首先进行条码格式判断
+                    bBarcodeValid = False
+                    for i, re_exp in enumerate(self.lst_re_exp):  # 遍历所有正则表达式，任何一个通过就说明条码被接受
+                        if barcode_formatcheck(str_bc_input, re_exp):  # 如果手动输入的条码通过正则校验,填加至序列等待处理
+                            bBarcodeValid = True
+                            break
+                    if not bBarcodeValid:                       # 不合格条码, 播放声音后退出
+                        self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}不符合格式规范!! ")
+                        self.show_status(f"clean 模式：条码 {str_bc_input} 不符合格式规范!!", "#FFB6C1")
+                        mixer.music.load(self.dict_sound['ms_barcode_reject'])
+                        mixer.music.play()
+                        return
 
-        def init_ui(self):
-            # 创建主布局 横线布局
-            main_layout = QHBoxLayout()
-            # 左侧布局为纵向布局  第一个为图片布局，第二个为信息布局
-            leftlayout = QVBoxLayout()
-            # 设置字体大小
-            font = QtGui.QFont()
-            # 设置字体大小
-            font.setPointSize(20)  # 设置字体大小为 20
-            self.setWindowTitle("接收条码")
-            self.setGeometry(100, 100, 300, 200)
+                    set_reading_confirm = self.inst_redis.getset("set_reading_confirm")  # 更新set_reading_confirm
+                    if str_bc_input in set_reading_confirm:                     # 已确认发出的条码 播放拒绝声音后退出
+                        self.inst_logger.info("条码已存在于confirm清单中")
+                        self.show_status(f"clean 模式：条码 {str_bc_input} 已回传系统！!", "#FFB6C1")
+                        mixer.music.load(self.dict_sound['ms_barcode_exist'])
+                        mixer.music.play()
+                        return
+                    self.exception_list.append(self.barcode_input)              # 排除以上问题，就可将条码加入list,用于变绿
 
-            self.MAWB = QLabel("MAWB:", self)
-            self.HAWB = QLabel("HAWB:", self)
+                    set_reading_gr = self.inst_redis.getset("set_reading_gr")   # 排除confirm后的gr 就是CV03上的gr
+                    if str_bc_input in set_reading_gr:                          # 扫描正常的包裹
+                        self.scanned_all.add(str_bc_input)
+                        self.scanned_gr.add(str_bc_input)
+                        self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}在正确读取清单reading_gr中")
+                        self.show_status(f"clean 模式：条码 {str_bc_input} 为正确读取条码", "#87CEEB")
+                        self.exception_list.append(str_bc_input)    # 用于变绿
+                        return
 
-            self.MAWB.setFont(font)
-            self.HAWB.setFont(font)
+                    set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 匹配多条码 更新set_reading_mr
+                    if str_bc_input in set_reading_mr:  # 捕获到多条码
+                        self.scanned_mr.add(str_bc_input)
+                        mixer.music.load(self.dict_sound['ms_barcode_rescan_accpet'])
+                        mixer.music.play()
+                        self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}在多条码清单reading_mr中")
+                        self.show_status(f"clean 模式：条码 {str_bc_input} 为MR条码", "#87CEEB")
+                        return
 
-            # 创建MAWB布局，HAWB布局
-            self.MAWBLayout = QHBoxLayout()
-            self.MAWBLayout.addWidget(self.MAWB)
-            self.HAWBLayout = QHBoxLayout()
-            self.HAWBLayout.addWidget(self.HAWB)
-            # 创建HAWBinfo
-            self.HAWBinfo = QGridLayout()
-            self.HAWBinfocreate()
-            # 创建左侧图片布局
-            self.pic_layout = QHBoxLayout()
-            self.picCreate()
-
-            # 创建左侧皮带机布局
-            self.pidaiji_layout = QGridLayout()
-            # 设置水平间距
-            self.pidaiji_layout.setHorizontalSpacing(0)  # 水平间距为 10 像素
-
-            # 设置垂直间距
-            self.pidaiji_layout.setVerticalSpacing(0)  # 垂直间距为 10 像素
-            self.pidaijiCreate()
-            # 设置皮带机布局的背景图片
-
-            #  设置输入框 和一个提交按钮
-            self.input = QLineEdit(self)
-            self.input.setPlaceholderText("输入条码")  # 设置输入框的占位符文本
-            self.input.setObjectName("edit2")
-            # self.input.setFocusPolicy(Qt.NoFocus)
-            # 创建提交按钮
-            self.btn_submit = QPushButton("提交", self)
-            self.btn_submit.setObjectName("submitbutton")
-            self.btn_submit.setIcon(QtGui.QIcon("./pic/submit.png"))
-            self.btn_submit.setIconSize(QtCore.QSize(28, 28))
-            # 隐藏控件
-            self.input.hide()
-            self.btn_submit.hide()
-
-            # 创建一个网格布局
-            self.showdatagridlayout = QGridLayout()
-            self.showdatavreate()
-            # 添加分割线
-            line = QFrame()
-            line.setFrameShape(QFrame.HLine)  # 设置为垂直分割线
-            line.setFrameShadow(QFrame.Sunken)  # 设置阴影效果
-            # 添加分割线
-            line1 = QFrame()
-            line1.setFrameShape(QFrame.HLine)  # 设置为垂直分割线
-            line1.setFrameShadow(QFrame.Sunken)  # 设置阴影效果
-            # self.btn_submit.setFixedSize(100, 40)  # 设置按钮大小
-            # self.btn_submit.clicked.connect(self.submit_clicked)
-            leftlayout.addLayout(self.pic_layout, 6)
-            leftlayout.addLayout(self.MAWBLayout, 1)  # 设置比例31112
-            leftlayout.addWidget(line)
-            leftlayout.addLayout(self.HAWBLayout, 1)  #
-            leftlayout.addLayout(self.HAWBinfo, 1)  #
-            leftlayout.addWidget(line1)
-            leftlayout.addLayout(self.showdatagridlayout, 1)
-            leftlayout.addWidget(self.input, 1)
-            leftlayout.addWidget(self.btn_submit, 1)
-            leftlayout.addLayout(self.pidaiji_layout, 2)
-            leftlayout.setContentsMargins(0, 0, 0, 0)
-
-            # 创建右侧布局 table控件
-            self.table_layout = QHBoxLayout()
-            self.tableCreate()
-            # 设置 QTableWidget 的属性，确保它不抢占焦点
-            self.tableWidget.setFocusPolicy(Qt.NoFocus)
-            # 将左侧布局，table布局加入主布局中
-
-            main_layout.addLayout(leftlayout, 4)
-            main_layout.addLayout(self.table_layout, 2)
-
-            # 设置窗口的布局
-            self.setLayout(main_layout)
-
-            # 开启线程 循环更新表格内容
-            self.timer = QtCore.QTimer()
-            self.timer.timeout.connect(self.update_table)
-            self.timer.start(500)
-            style_file = './qss/table.qss'
-            with open(style_file, 'r', encoding='utf-8') as f:
-                self.setStyleSheet(f.read())
-            # 启动一个线程，接收stream数据 并且更新图片
-            thread = threading.Thread(target=self.pic_show)
-            # 设置线程为守护线程
-            thread.daemon = True
-            thread.start()
-            # 最大化
-            self.showMaximized()
-            # self.showFullScreen()
-            self.setFocus()
-
-        def update_barcode(self, strManualScanBarcode):
-            # self.label.setText(f"接收到的条码：{strManualScanBarcode}")
-            # 条码存入redis  __cli_id__  manualscan:cli_01:input
-            self.inst_redis.setkey(f"manualscan:{self.__prc_name__}:input", f"{strManualScanBarcode}")
-
-        def keyPressEvent(self, event):
-            """
-            捕捉键盘按键事件，当用户按下键盘时，更新条码内容。
-            扫码枪通常会将条码数据当作普通键盘输入，按下回车键表示输入结束。
-            """
-            try:
-                key = event.key()
-
-                if key == Qt.Key_Return or key == Qt.Key_Enter:
-                    # print(self.barcode_input)
-                    # 回车键表示条码输入完成
-                    if self.barcode_input:
-                        #  如果扫到特殊条码并且在异常模式，则结束异常模式，将所有扫入的条码通过比较，添加到parcel中，并且比较noread和mrread逻辑是否正确
-                        if self.barcode_input == "99" and self.exception_handling == 1:
-                            self.barcode_input = ""
-                            outCV3barcode = []
-                            wait_list = []
-                            lst_reading_mr = []
-                            self.inst_logger.info("扫到特殊条码，结束异常模式")
-                            # 判断异常条码列表有多少个，获取nr有多少个，mr有多少个
-                            lst_reading_nr = list(self.inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
-                            # set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
-                            set_reading_gr = self.inst_redis.getset("set_reading_gr")
-                            self.inst_logger.info(f"异常条码为：{self.nofound_list}")
-                            self.inst_logger.info(f"补入的所有条码为：{self.exception_list}")
-
-                            for i in self.exception_list:
-                                if i not in set_reading_gr:
-                                    outCV3barcode.append(i)
-                            self.inst_logger.info(f"补入的条码不在GR的为：{outCV3barcode}")
-                            # 先比较mr，找到redis中mr的数量，比较outCV3barcode 如果redis中的mr全找到，将找到的数据存入待提交的列表 wait_list 从exception_list删除
-                            # 遍历parcel中所有MR的条码，全部添加到set_reading_mr中
-                            keys = self.inst_redis.keys("parcel:scan_result:*")
-                            for key in keys:
-                                # 解码键名
-                                parts = key.split(':')  # 分割键名
-                                if self.inst_redis.getkey(f"parcel:scan_result:{parts[2]}") == "MR":
-                                    lst_reading_mr.append(self.inst_redis.getkey(f"parcel:barcode:{parts[2]}"))
-                            self.inst_logger.info(f"redis中Noread条码为：{lst_reading_nr}，Mrread条码为：{lst_reading_mr}")
-                            self.inst_logger.info(f"parcel中所有MR的条码为：{lst_reading_mr}")
-                            tail = 0
-                            for mr in lst_reading_mr:
-                                if mr in outCV3barcode:
-                                    self.inst_logger.info(f"扫入的条码存在mr：{mr}中，将mr放入待提交列表")
-                                    wait_list.append(mr)
-                                    outCV3barcode.remove(mr)
-                                # 如果redis中的mr有未找到的，删除redis中该条码的内容，parcel
-                                else:
-                                    # 删除错的或者多余的redis里的mr
-                                    mr_uid = self.inst_redis.getkey(f"parcel:ms_barcode:{mr}")
-                                    # 把mr_uid最后一位换成tail
-                                    mr_uid = mr_uid[:-1] + str(tail)
-                                    self.inst_logger.info(f"需要删除的mr_uid为：{mr_uid}")
-                                    # 根据uid进行删除barcode posx posy sid scan_result
-                                    self.inst_logger.info(f"{mr}不在扫入的条码中，为错码或者重复码，在parcel中进行删除")
-                                    self.inst_redis.clearparcelkey(f"parcel:barcode:{mr_uid}")
-                                    self.inst_redis.clearparcelkey(f"parcel:posx:{mr_uid}")
-                                    self.inst_redis.clearparcelkey(f"parcel:posy:{mr_uid}")
-                                    self.inst_redis.clearparcelkey(f"parcel:scan_result:{mr_uid}")
-                                    self.inst_redis.clearparcelkey(f"parcel:sid:{mr_uid}")
-                                    try:
-                                        self.inst_logger.info(f"将{mr_uid}移除遍历队列")
-                                        self.uid_deque.remove(mr_uid)  # 移除队列
-                                    except Exception as e:
-                                        self.inst_logger.info(traceback.format_exc())
-                                    # self.inst_logger.info(f"{mr}不在扫入的条码中，为错码，进行parcel中删除")
-                                    # 去掉set_reading_mr中对应的mr
-                                    # self.inst_redis.clearsetvalue('set_reading_mr', mr)
-
-                                    tail = tail + 1
-                            # outCV3barcode 中剩余的数量与redis中的nr做对比，如果数量相等，将所有的条码加入到wait_list
-                            self.inst_logger.info(f"处理完mr后，剩下的条码为：{outCV3barcode}")
-                            if len(outCV3barcode) == len(lst_reading_nr):
-                                self.inst_logger.info(f"outCV3barcode中剩余的数量与redis中的nr数量相等，将所有的条码加入到wait_list")
-                                wait_list.extend(outCV3barcode)
-                                outCV3barcode.clear()
-                            elif len(outCV3barcode) > len(lst_reading_nr):
-                                # 从outCV3barcode中取len(lst_reading_nr)个条码出来放到wait_list中,outCV3barcode中剩下的条码添加到HIK中
-                                for i in range(len(lst_reading_nr)):
-                                    wait_list.append(outCV3barcode[i])
-                                    outCV3barcode.remove(outCV3barcode[i])
-                                self.inst_logger.info(f"outCV3barcode中剩余的数量大于redis中的nr数量，把多的条码添加到stm_test中")
-                                for i in outCV3barcode:
-                                    dictValidData = {}
-                                    nowtime = datetime.datetime.now()
-                                    # 获取当前时间的时间戳
-                                    timestamp = nowtime.timestamp()
-                                    # 将时间戳转换为字符串
-                                    timestamp_str = str(int(timestamp))
-                                    dictValidData['uid'] = 'MS' + timestamp_str
-                                    dictValidData['req_ts'] = str(nowtime)
-                                    dictValidData['pos_x'] = 4500
-                                    dictValidData['pos_y'] = 0
-                                    dictValidData['code'] = i
-                                    dictValidData['result'] = 'MS_AS'
-                                    self.inst_redis.xadd("stream_test", dictValidData)
-                                    self.inst_logger.info(f"添加stream_test成功,条码为：{i}")
-                            elif len(outCV3barcode) < len(lst_reading_nr):
-                                self.inst_logger.info(f"outCV3barcode中剩余的数量小于redis中的nr数量，删除redis中多余的nr")
-                                x = len(lst_reading_nr) - len(self.exception_list)
-                                # redis里删除x个nr的内容
-                                keys = self.inst_redis.keys("parcel:scan_result:*")
-                                for key in keys:
-                                    # 解码键名
-                                    parts = key.split(':')  # 分割键名
-                                    if self.inst_redis.getkey(f"parcel:scan_result:{parts[2]}") == "NR":
-                                        self.inst_redis.clearparcelkey(f"parcel:posx:{parts[2]}")
-                                        self.inst_redis.clearparcelkey(f"parcel:scan_result:{parts[2]}")
-                                        self.inst_redis.clearparcelkey(f"parcel:posy:{parts[2]}")
-                                        self.inst_redis.clearparcelkey(f"parcel:sid:{parts[2]}")
-                                        try:
-                                            self.uid_deque.remove(parts[2])
-                                        except:
-                                            self.inst_logger.info(traceback.format_exc())
-                                        result = self.inst_redis.clearsetvalue('set_reading_nr', parts[2])
-                                        if result == 1:
-                                            self.inst_logger.info(f"{parts[2]}在set_reading_nr中删除成功")
-                                        else:
-                                            self.inst_logger.info(f"{parts[2]}在set_reading_nr中删除失败")
-                                        x = x - 1
-                                        if x <= 0:
-                                            break
-
-                            # 处理完成后将wait_list中的条码放到redis中，并且清空wait_list
-                            for i in wait_list:
-                                while True:
-                                    input = self.inst_redis.getkey(f"manualscan:{self.__prc_name__}:input")
-                                    if input == "" or input is None:
-                                        self.inst_redis.setkey(f"manualscan:{self.__prc_name__}:input", f"{i}")
-                                        self.inst_logger.info(f"提交给munulscan处理中：{i}")
-                                        break
-                            time.sleep(1)
-                            self.exception_handling = 0
-                            self.nofound_list = []
-                            self.exception_list = []
-
-                        # 如果处于异常处理时，扫入的条码添加到异常列表中，通过表格去比对，显示不一样的颜色
-                        if self.exception_handling == 1:
-                            self.inst_logger.info(f"异常模式下扫码枪输入条码：{self.barcode_input}")
-                            for i, re_exp in enumerate(self.lst_re_exp):  # 遍历所有正则表达式，任何一个通过就说明条码被接受
-                                if barcode_formatcheck(self.barcode_input, re_exp):  # 如果手动输入的条码通过正则校验,填加至序列等待处理
-                                    found = False
-                                    for row, result in enumerate(self.results):
-                                        if self.barcode_input == result['barcode']:
-                                            found = True  # 找到了，设置标志为 True
-                                            break  # 退出循环
-                                        # 如果遍历完 self.results 后发现 self.barcode_input 不在其中
-                                    if not found:
-                                        self.nofound_list.append(self.barcode_input)  # 将 self.barcode_input 添
-                                    # self.label1.setText(f"未出现过的条码：{self.nofound_list}")
-                                    self.exception_list.append(self.barcode_input)
-                                    print(self.exception_list)
-                                    self.inst_logger.info(f"扫入条码exception_list为：[]")
-                        elif self.barcode_input != "":
-                            self.update_barcode(self.barcode_input)
-                            self.scanbarcode = self.barcode_input
-                            self.barcode_input = ""  # 清空当前条码
-                        # self.label.setText(f"接收到的条码：{self.barcode_input}")
-                        self.scanbarcode = self.barcode_input
-                        self.barcode_input = ""  # 清空当前条码
-                else:
-                    # 添加按下的字符到条码输入
-                    self.barcode_input += event.text()
-            except Exception as e:
-                print(f"Error in keyPressEvent: {e}")
-                print(traceback.format_exc())
-    except:
-        print(traceback.format_exc())
+                    # 收到一个合格条码，但不在以上清单中，视为NR补码
+                    self.scanned_nr.add(str_bc_input)
+                    mixer.music.load(self.dict_sound['ms_barcode_rescan_accpet'])
+                    mixer.music.play()
+                    self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}不在任何清单中,视为NR补码成功")
+                    self.show_status(f"clean 模式：条码 {str_bc_input} 为NoRead条码", "#87CEEB")
+                except Exception as e:
+                    print(f"Error in keyPressEvent: {e}")
+                    print(traceback.format_exc())
 
     def tableCreate(self):
         font = QtGui.QFont()
@@ -510,18 +502,20 @@ class BarcodeDisplay(QWidget):
                 return
             # 获取redis中plc是否停线，如果plc停线，进入异常处理操作
             self.control_update()
-            plc_conv_status = self.inst_redis.getkey("plc_conv:status")
-            if plc_conv_status == 'pause' and self.exception_handling == 0:
-                time.sleep(2)
-                if self.inst_redis.getkey("plc_conv:status") == 'pause':
-                    self.exception_handling = 1
+
+            # plc_conv_status = self.inst_redis.getkey("sys:status")
+            # 扫描特殊条码*clean* 进入手动清场这模式
+            # if plc_conv_status == 'clean' and self.exception_handling == 0:
+            #    time.sleep(1)
+            #    if self.inst_redis.getkey("plc_conv:status") == 'pause':
+            #        self.exception_handling = 1
                     # 创建一个消息框
-                    msg_box = QMessageBox()
-                    msg_box.setIcon(QMessageBox.Critical)
-                    msg_box.setText("进入异常处理阶段，请扫描CV3所有条码")
-                    msg_box.setWindowTitle("错误")
-                    msg_box.setStandardButtons(QMessageBox.Ok)
-                    msg_box.exec_()
+            #        msg_box = QMessageBox()
+            #        msg_box.setIcon(QMessageBox.Critical)
+            #        msg_box.setText("请逐个扫描包裹条码")
+            #        msg_box.setWindowTitle("！！进入清场模式！！")
+            #        msg_box.setStandardButtons(QMessageBox.Ok)  #后续改成不显示cancel 不能直接按回车取消 避免直接扫描条码的回车带走该框
+            #        msg_box.exec_()
 
             # 先将所有颜色恢复成灰色
             for i in range(18):
@@ -556,7 +550,8 @@ class BarcodeDisplay(QWidget):
                 posy_value = self.inst_redis.getkey(posy_key)
                 scan_result_value = self.inst_redis.getkey(scan_result_key)
                 if barcode_value == None and posx_value == None and posy_value == None and scan_result_value == None:
-                    self.uid_deque.remove(key)
+                    if key in self.uid_deque:
+                        self.uid_deque.remove(key)
                     continue
                 # 将值放入列表中
                 self.results.append({
@@ -775,7 +770,7 @@ class BarcodeDisplay(QWidget):
             # 连接到FTP服务器
             ip = self.server_ip
             ftp = FTP(ip)  # 服务器地址
-            ftp.login('', '')  # 使用正确的用户名和密码
+            ftp.login('ftp', '')  # 使用正确的用户名和密码
             self.inst_logger.info(f"ftp_path{ftp_path}")
             # 图片文件的路径，切换到正确的目录
             ftp.cwd(f'{ftp_path}')  # 实际路径
@@ -865,29 +860,52 @@ class BarcodeDisplay(QWidget):
     def control_update(self):
         lst_reading_nr = list(self.inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
         set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
+        str_sysstatus = self.inst_redis.getkey("sys:status")  # 更新sys status
         self.NR.setText(f"NR:{len(lst_reading_nr)}")
         self.MR.setText(f"MR:{len(set_reading_mr)}")
-        # for i in range(len(lst_reading_nr)):
-        #     if i == 0:
-        #         self.NR_1.setText(f"{lst_reading_nr[0]}")
-        #         continue
-        #     if i == 1:
-        #         self.NR_2.setText(f"{lst_reading_nr[1]}")
-        #         continue
-        #     if i == 2:
-        #         self.NR_3.setText(f"{lst_reading_nr[2]}")
-        #         continue
-        # set_reading_mr = list(set_reading_mr)  # 将集合转换为列表
-        # for i in range(len(set_reading_mr)):
-        #     if i == 0:
-        #         self.MR_1.setText(f"{set_reading_mr[0]}")
-        #         continue
-        #     if i == 1:
-        #         self.MR_2.setText(f"{set_reading_mr[1]}")
-        #         continue
-        #     if i == 2:
-        #         self.MR_3.setText(f"{set_reading_mr[2]}")
-        #         continue
+        self.sysstatus.setText(f"{str_sysstatus}")
+        str_batchid = self.inst_redis.getkey("sys:batchid")
+        self.total_number.setText(str_batchid)
+        str_batchid_count = self.inst_redis.getkey("sys:hawb:count")
+        self.hpk_number.setText(str_batchid_count)
+        self.out_number.setText("0")
+        if len(lst_reading_nr) == 0:
+            self.NR_1.setText(f"")
+            self.NR_2.setText(f"")
+            self.NR_3.setText(f"")
+
+        for i in range(len(lst_reading_nr)):
+            if i == 0:
+                self.NR_1.setText(f"NO READ BARCODE")
+                self.NR_2.setText(f"")
+                self.NR_3.setText(f"")
+                continue
+            if i == 1:
+                self.NR_1.setText(f"NO READ BARCODE")
+                self.NR_2.setText(f"NO READ BARCODE")
+                self.NR_3.setText(f"")
+                continue
+            if i >= 2:
+                self.NR_1.setText(f"NO READ BARCODE")
+                self.NR_2.setText(f"NO READ BARCODE")
+                self.NR_3.setText(f"NO READ BARCODE")
+                continue
+        templst_reading_mr = list(set_reading_mr)  # 将集合转换为列表
+        if len(set_reading_mr) == 0:
+            self.MR_1.setText(f"")
+            self.MR_2.setText(f"")
+            self.MR_3.setText(f"")
+
+        for i in range(len(set_reading_mr)):
+            if i == 0:
+                self.MR_1.setText(f"{templst_reading_mr[0]}")
+                continue
+            if i == 1:
+                self.MR_2.setText(f"{templst_reading_mr[1]}")
+                continue
+            if i >= 2:
+                self.MR_3.setText(f"{templst_reading_mr[2]}")
+                continue
 
     def showdatavreate(self):
         # 创建网格布局
@@ -1001,7 +1019,10 @@ class BarcodeDisplay(QWidget):
     #     line.setFrameShape(QFrame.HLine)  # 设置为水平分割线
     #     line.setFrameShadow(QFrame.Sunken)  # 设置分割线的阴影效果
     #     self.HAWBinfo.addWidget(line, 2, 0, 1, 3)  # 这个方法会让分割线跨越 0 到 2 列
-
+    def show_status(self, message, color):
+        self.statusbar.showMessage(message)
+        self.statusbar.setStyleSheet(f"background: {color};")
+        # QTimer.singleShot(2000, self.clear_status)
 
 def start_process(config_file, __cli_id__):
     __prc_cli_type__ = f"cli_qt"

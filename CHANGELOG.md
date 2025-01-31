@@ -212,6 +212,28 @@ Fix bug of manusal scan, after nr_ms and mr_ms, barcode should add into set_read
 # Rev 0.4.2
 Update cli_qt, ms_as mode, not all test success
 
+# Rev 0.5.0
+Update stm_ReadingConfirm, check db to order_info_ex,add batch_id for test;
+select same batch_id and keep update count into redis sys:hawb:count
+Update main,stm_ms,stm_hikc for sys:status,startup with 'idle', start run change to 'normal',find nr or mr change to 'alert', not ms on time(conveyor pause) change to 'stop', scan *enterclean* change to 'clean', scan  *endclean* change to normal
+
+when status is not 'normal', sound and pic will not apply to normal parcel, only nr or mr.
+
+Update client_qt,rewrith key_event.add code for enter and end clean mode, during clean mode no action really done(later need to add manual scan), when end clean mode, clean all nr,mr,ms_nr,ms_mr set, restart conv
+
+add statusbar, show enter and leave clean mode; during clean mode show status and scanned barcode
+fix bug of remover from deque
+change ftp server to filezilla, ftp user ftp, no password
+
+Update prc_plc, fix bug for posx still in list; delete posx before check parcel valid.if invalid parcel leave conveyor, only warning; 
+add resume function, when endclean , conv resume when sys:status change to 'resume', after conv start, sys:status change to 'normal'
+
+Update fHIKC, when receive MR, check if same barcode inside. if does, delete all same barcode.
+
+
+
+
+
 
 
 

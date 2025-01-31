@@ -36,7 +36,7 @@ def start_process(config_file,__cli_id__):
     dict_sound = {}
     dict_sound['ms_barcode_reject']= __ini_prc_config__.Sound.ms_barcode_reject
     dict_sound['ms_barcode_exist']= __ini_prc_config__.Sound.ms_barcode_exist
-    dict_sound['ms_barcode_rescan_accpet']= __ini_prc_config__.Sound.ms_barcode_rescan_accpet    
+    dict_sound['ms_barcode_rescan_accept']= __ini_prc_config__.Sound.ms_barcode_rescan_accept
 
     # 取得ini文件中的全部条码正则表达式列表
     # ToDo 自动遍历ini文件中，barcode字段下的所有正则表达式
@@ -104,7 +104,7 @@ def start_process(config_file,__cli_id__):
         if strManualScanBarcode in lst_reading_mr:      
             print("Get MRead Barcode !!")
             inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode,'type':'MR'})      # 插入 Manual Scan stream/MR
-            mixer.music.load(dict_sound['ms_barcode_rescan_accpet'])
+            mixer.music.load(dict_sound['ms_barcode_rescan_accept'])
             mixer.music.play()
             continue
         
@@ -115,7 +115,7 @@ def start_process(config_file,__cli_id__):
                 inst_redis.xadd( "stream_manualscan", {'cli_id':__cli_id__,'scan_id':__prc_id__,'barcode':strManualScanBarcode,'type':'NR'})      # 插入 Manual Scan stream/NR
                 print("Barcode valid,insert into system")
                 bBarcodeValid = True
-                mixer.music.load(dict_sound['ms_barcode_rescan_accpet'])
+                mixer.music.load(dict_sound['ms_barcode_rescan_accept'])
                 mixer.music.play()                
                 break
         if not bBarcodeValid:

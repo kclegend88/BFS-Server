@@ -164,6 +164,13 @@ def start_process(config_file):
             str_result = inst_redis.getkey(f"parcel:scan_result:{str_uid}")
             str_barcode = inst_redis.getkey(f"parcel:barcode:{str_uid}")
 
+            inst_redis.clearkey(f"{key}")
+            inst_redis.clearkey(f"parcel:posy:{str_uid}")
+            inst_redis.clearkey(f"parcel:sid:{str_uid}")
+            inst_redis.clearkey(f"parcel:scan_result:{str_uid}")
+            inst_redis.clearkey(f"parcel:barcode:{str_uid}")
+            inst_logger.debug(f"包裹已经离开CV03,uid={str_uid},barcode={str_barcode}")
+
             if not str_result in ['GR','MR_MS','NR_MS','MS_AS']:    # 有异常包裹流出
                inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}") 
                # 发送停线指令
@@ -179,13 +186,7 @@ def start_process(config_file):
 
             inst_redis.xadd( "stream_reading_confirm", dict_reading_con)      # 插入stream
             # 清理redis中CV03上的包裹信息
-            inst_redis.clearkey(f"{key}")
-            inst_redis.clearkey(f"parcel:posy:{str_uid}")
-            inst_redis.clearkey(f"parcel:sid:{str_uid}")
-            inst_redis.clearkey(f"parcel:scan_result:{str_uid}")
-            inst_redis.clearkey(f"parcel:barcode:{str_uid}")
-            # inst_redis 
-            inst_logger.debug(f"包裹已经离开CV03,uid={str_uid},barcode={str_barcode}") 
+            # inst_redis
 
     __prc_name__="PLC"                      ### 需手动配置成线程名称
     
@@ -252,6 +253,8 @@ def start_process(config_file):
 
     if __ini_start_conv:            #根据配置文件决定，是否直接启动输送机
         inst_redis.setkey("plc_conv:command","start")
+        inst_redis.setkey("sys:status", "normal")
+
     # 以上为定制初始化区域
     # --------------------    
 
@@ -296,7 +299,21 @@ def start_process(config_file):
         if not plc_conv_fullspeed:
             if not plc_conv_status=='pause':
                 prc_PLC_autostop()
+                inst_redis.setkey("sys:status","stop")
             
+        # 在client中，sys:status被修改为resume, server中，PLC线程将resume执行成start
+        str_sys_status = inst_redis.getkey("sys:status")
+        if str_sys_status == "resume":    # resume状态,重启输送机
+            inst_logger.info("线程 %s 中, 收到resume 清场模式的指令" %(__prc_name__,))
+            # 判断PLC状态
+            if plc_conv_status != 'pause':
+                inst_logger.error("线程 %s 在收到resume命令时发现输送机速度状态异常" % (__prc_name__,))
+                inst_redis.setkey("sys:status","normal")
+                continue
+            inst_redis.setkey("sys:status", "normal")
+            inst_logger.info("成功退出清场模式，线程 %s 尝试重新启动输送机" % (__prc_name__,))
+            prc_PLC_startconv()
+        
         # 以上为主线程操作区       
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储

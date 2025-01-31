@@ -383,3 +383,22 @@ class clsRedis:
     def keys(self, pattern):
         # 获取所有匹配的键
         return self.decoded_connection.keys(pattern)
+
+    def clearparcelkey(self, key):
+        # 清除键对
+        if self.__isconnected__:
+            if self.decoded_connection.exists(key):
+                self.decoded_connection.delete(key)
+            else:
+                # 键不存在时记录日志或执行其他操作
+                return
+        else:
+            raise Exception("Redis尚未建立连接")
+
+    def clearsetvalue(self, setname, value):
+        #  删除集合中对应的值
+        if self.__isconnected__:
+            value = self.decoded_connection.srem(setname, value)
+            return value
+        else:
+            raise Exception("Redis尚未建立连接")

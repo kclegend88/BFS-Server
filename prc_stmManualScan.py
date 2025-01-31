@@ -67,12 +67,14 @@ def start_process(config_file):
         if plc_conv_status == 'run':
             if plc_conv_fullspeed == 'countdown':
                 inst_redis.setkey("plc_conv:command",'autospeedup')
+                inst_redis.setkey("sys:status", "normal")
                 inst_logger.info("包裹补码成功，线程 %s 尝试将输送机恢复至正常速度" %(__prc_name__,))
             else:
                 inst_logger.error("线程 %s 在恢复输送机速度时发现状态异常" %(__prc_name__,))
                 return
         else:
             inst_redis.setkey("plc_conv:command",'start')       # 如果不在运转，则说明已停机，需重新启动
+            inst_redis.setkey("sys:status","normal")
             inst_logger.info("包裹补码成功，线程 %s 尝试重新启动输送机" %(__prc_name__,))
 
 

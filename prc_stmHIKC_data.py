@@ -2,6 +2,7 @@
 import json
 import threading
 import time
+import fBarcode
 import datetime
 
 from fLog import clsLogger
@@ -44,7 +45,8 @@ def start_process(config_file):
                 if plc_conv_fullspeed=="yes":
                     inst_logger.info("发送减速信号autoslowdown，条码读取异常，MR")                      
                     inst_redis.setkey(f"plc_conv:command","autoslowdown")            # slow down conv
-                    
+                    inst_redis.setkey("sys:status", "alert")
+
             elif dictdata['result']=='NR':      # 无条码    
                 inst_redis.setkey(f"parcel:scan_result:{dictdata['uid']}",'NR')     # uid对应的包裹，扫描结果 NR
                 inst_redis.sadd("set_reading_nr", dictdata['uid'])                  # NR的包裹，无条码，将uid加入set_reading_nr
@@ -55,6 +57,7 @@ def start_process(config_file):
                 if plc_conv_fullspeed=="yes":
                     inst_logger.info("发送减速信号autoslowdown，条码读取异常，NR")                      
                     inst_redis.setkey(f"plc_conv:command","autoslowdown")            # slow down conv
+                    inst_redis.setkey("sys:status", "alert")
             #inst_redis.ACK("stream_test",i)
             #inst_redis.ACK("stream_test",i)
             elif dictdata['result']=='MS_AS':      # 异常停止时增加的条码
