@@ -306,7 +306,6 @@ class clsHIKCameraClient:
         else:
             self.append_exception("check_recvbuf", "数据解析出现异常")
 
-        
     #将缓冲区内的数据，发送至服务器
     def send(self, data):
         if not self.bDISCONNECT:

@@ -172,10 +172,10 @@ def start_process(config_file):
             inst_logger.debug(f"包裹已经离开CV03,uid={str_uid},barcode={str_barcode}")
 
             if not str_result in ['GR','MR_MS','NR_MS','MS_AS']:    # 有异常包裹流出
-               inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}") 
+               inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}")
                # 发送停线指令
                # prc_PLC_autostop() 
-               continue
+               continue     # 非正常包裹的信息不发送给stm_reading_confirm
             # 包裹正常流出
             dict_reading_con['uid'] = str_uid
             dict_reading_con['ts'] = datetime.datetime.now().isoformat()

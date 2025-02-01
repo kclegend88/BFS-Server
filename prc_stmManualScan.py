@@ -51,6 +51,7 @@ def start_process(config_file):
             inst_logger.info("包裹补码成功,线程 %s 修改NR包裹状态 uid= %s, barcode =%s"%(__prc_name__,parcel_uid,lst_ms_nr[i]))
         inst_redis.clearset("set_ms_nr")
         inst_redis.clearset("set_reading_nr")
+        # stm_ms 清理
             
         for parcel_barcode in set_reading_mr:
             parcel_uid = inst_redis.getkey(f"parcel:ms_barcode:{parcel_barcode}")

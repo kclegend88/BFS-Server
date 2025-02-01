@@ -53,6 +53,8 @@ def start_process(config_file):
             if prc_tp_counter % 10 == 0:
                 resp_long = inst_redis.lpush_ct(f"lst_ct:scanner_tp_long",resp['avg_ct'])
                 inst_logger.debug("扫描流量数据已更新，scanner_tp_short = %d, scanner_tp_long = %d"%(3600000//resp['avg_ct'],3600000//resp_long['avg_ct']))    
+                inst_redis.setkey("tp:short",f"{3600000//resp['avg_ct']}")
+                inst_redis.setkey("tp:long", f"{3600000//resp_long['avg_ct']}")
 
         # only for debug, add recv-data directly to stream_buf
         # ----------------

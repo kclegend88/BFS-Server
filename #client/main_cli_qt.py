@@ -149,31 +149,45 @@ class BarcodeDisplay(QWidget):
         leftlayout = QVBoxLayout()
         # 设置字体大小
         font = QtGui.QFont()
-        # 设置字体大小
-        font.setPointSize(20)  # 设置字体大小为 20
+        font.setPointSize(20)
+        font.setBold(True)
+        
+        font1 = QtGui.QFont()
+        font1.setPointSize(15)
+                
         self.setWindowTitle("接收条码")
         self.setGeometry(100, 100, 300, 200)
 
+        status_front = QtGui.QFont("Arial",16)
         self.statusbar = QStatusBar()
-        self.caps_lock_label = QLabel("Caps Lock : OFF")
-        self.statusbar.addPermanentWidget(self.caps_lock_label)
+        self.statusbar.setFont(status_front)
+        # self.caps_lock_label = QLabel("Caps Lock : OFF")
+        # self.statusbar.addPermanentWidget(self.caps_lock_label)
 
         #self.pagelabel = QLabel("Current Page : 1")
         #self.statusbar.addWidget(self.pagelabel)
 
         self.statusbar.showMessage("Client Start",4000)
 
-        self.MAWB = QLabel("MAWB:", self)
-        self.HAWB = QLabel("HAWB:", self)
-        self.sysstatus = QLabel("status", self)
+        self.tpbar = QStatusBar()
+        self.tpbar.setFont(status_front)
 
+        self.MAWB = QLabel("MAWB:", self)
         self.MAWB.setFont(font)
+        self.mawbcount = QLabel("xx", self)
+        self.mawbcount.setFont(font1)
+        self.STATUS = QLabel("Status:", self)
+        self.STATUS.setFont(font)
+        self.sysstatus = QLabel("status", self)
+        self.sysstatus.setFont(font1)
+        self.HAWB = QLabel("HAWB:", self)
         self.HAWB.setFont(font)
-        self.sysstatus.setFont(font)
+
 
         # 创建MAWB布局，HAWB布局
         self.MAWBLayout = QHBoxLayout()
         self.MAWBLayout.addWidget(self.MAWB)
+        self.MAWBLayout.addWidget(self.STATUS)
         self.MAWBLayout.addWidget(self.sysstatus)
         self.HAWBLayout = QHBoxLayout()
         self.HAWBLayout.addWidget(self.HAWB)
@@ -232,6 +246,7 @@ class BarcodeDisplay(QWidget):
         leftlayout.addWidget(self.btn_submit, 1)
         leftlayout.addLayout(self.pidaiji_layout, 2)
         leftlayout.addWidget(self.statusbar,1)
+        leftlayout.addWidget(self.tpbar,1)
         leftlayout.setContentsMargins(0, 0, 0, 0)
 
         # 创建右侧布局 table控件
@@ -861,6 +876,12 @@ class BarcodeDisplay(QWidget):
         lst_reading_nr = list(self.inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
         set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
         str_sysstatus = self.inst_redis.getkey("sys:status")  # 更新sys status
+        if str_sysstatus == "normal":
+            str_tp_short = self.inst_redis.getkey("tp:short")
+            str_tp_long = self.inst_redis.getkey("tp:long")
+            if str_tp_long:
+                self.tpbar.showMessage(f"流量已更新，瞬时流量 {str_tp_short} 件/小时；平均流量 {str_tp_long} 件/小时")
+            
         self.NR.setText(f"NR:{len(lst_reading_nr)}")
         self.MR.setText(f"MR:{len(set_reading_mr)}")
         self.sysstatus.setText(f"{str_sysstatus}")

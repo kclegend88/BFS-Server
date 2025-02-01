@@ -229,7 +229,8 @@ Update prc_plc, fix bug for posx still in list; delete posx before check parcel 
 add resume function, when endclean , conv resume when sys:status change to 'resume', after conv start, sys:status change to 'normal'
 
 Update fHIKC, when receive MR, check if same barcode inside. if does, delete all same barcode.
-
+# Rev 0.5.1
+Update tp bar in QT, modify log size of main
 
 
 
