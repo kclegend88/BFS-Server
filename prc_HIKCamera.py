@@ -4,6 +4,7 @@ import threading
 import time
 import datetime
 
+from fBarcode import barcode_existingcheck
 from fLog import clsLogger
 from fConfig import clsConfig
 from fConfigEx import clsConfigEx
@@ -37,7 +38,20 @@ def start_process(config_file):
         # Redis 插入子函数，将数据插入stream,
         nonlocal cli,inst_logger,inst_redis,prc_tp_luts,prc_tp_counter
         
-        for i,d in enumerate(cli.lstValidData):               
+        for i,d in enumerate(cli.lstValidData):
+            # 条码正确读取，开始进行条码规则判断
+            # 如果包裹为OK，result设为 NG_xx，
+            # 如果包裹为OK，result设为 GR
+            # 此处只做两个判断，a: 是否在主单中，不是则为OP; b: 是否为通缉，是则为RJ，不是则为OK
+            # 对每一个GR和MR的进行检查
+            set_hawb = inst_redis.getset("set_hawb")
+            set_hawb_rj = inst_redis.getset("set_hawb_rj")
+            barcode=d['code']
+            if barcode and barcode_existingcheck(barcode,set_hawb_rj):  # 通缉件
+                d['result'] = 'NG_RJ'
+            if barcode and not barcode_existingcheck(barcode,set_hawb): # 溢装件
+                d['result'] = 'NG_OP'
+
             inst_redis.xadd( "stream_test", d)      # 插入stream
 
             current_ts=datetime.datetime.now()      

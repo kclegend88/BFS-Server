@@ -1,6 +1,8 @@
 # prc_template  v 0.2.0
 import time
 import datetime
+import traceback
+
 from fLog import clsLogger
 from fConfig import clsConfig
 from fConfigEx import clsConfigEx
@@ -65,13 +67,15 @@ def start_process(config_file):
     cursor = conn.cursor()
     # 创建订单表格
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS order_info_ex (
+        CREATE TABLE IF NOT EXISTS order_info_check (
             UID INTEGER PRIMARY KEY AUTOINCREMENT,  -- 编号
             OSN TEXT NOT NULL,  
             TS TEXT,
             SR TEXT,
             TEST_ID TEXT,
-            BATCH_ID TEXT
+            BATCH_ID TEXT,
+            STATUS TEXT,
+            CHECK_RESULT TEXT
         )
     """)    
     while b_thread_running:
@@ -88,10 +92,19 @@ def start_process(config_file):
             str_batchid=inst_redis.getkey("sys:batchid")
             for i,dictdata in l[0][1]:             # 遍历收到的所有消息
                 try:
-                    cursor.execute('INSERT INTO order_info_ex (OSN,TS,SR,TEST_ID,BATCH_ID) VALUES (?,?,?,?,?)',
-                           (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid'],str_batchid))
+                    hawb_status = inst_redis.getkey(f"hawb:status:{dictdata['barcode']}")
+                    if not hawb_status:
+                        inst_logger.error("本单状态值为空,单号 %s" %(dictdata['barcode'],))
+                        hawb_status = "***"
+                    hawb_check =  inst_redis.getkey(f"parcel:check_result:{dictdata['uid']}")
+                    if not hawb_check:
+                        inst_logger.error("本单核查结果为空,单号 %s" %(dictdata['barcode'],))
+                        hawb_check = "*OK*"
+
+                    cursor.execute('INSERT INTO order_info_check (OSN,TS,SR,TEST_ID,BATCH_ID,STATUS,CHECK_RESULT) VALUES (?,?,?,?,?,?,?)',
+                           (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid'],str_batchid,hawb_status,hawb_check))
                     # Only for debug
-                    inst_logger.debug("SQLite DB 写入成功,条码 %s,时间戳 %s,扫描结果 %s, 扫描ID %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))        
+                    inst_logger.debug("SQLite DB 写入成功,条码 %s,时间戳 %s, 扫描结果 %s, 扫描ID %s， 状态为 %s， 核查结果为 %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid'],hawb_status,hawb_check))
                     # Only for debug
                     inst_redis.sadd("set_reading_confirm", dictdata['barcode'])  # 将条码加入set_reading_confirm
 
@@ -102,7 +115,7 @@ def start_process(config_file):
                     conn.commit()
 
                 try:
-                    cursor.execute('SELECT count(*) from order_info_ex where BATCH_ID = ?',(str_batchid,))
+                    cursor.execute('SELECT count(*) from order_info_check where BATCH_ID = ?',(str_batchid,))
                     count_data = cursor.fetchall()
                     inst_logger.debug("当前测试 %s 总计包裹 %s"%(str_batchid,count_data[0][0]))
                     inst_redis.setkey("sys:hawb:count",f"{count_data[0][0]}")

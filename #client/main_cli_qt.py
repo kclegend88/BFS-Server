@@ -86,7 +86,7 @@ class BarcodeDisplay(QWidget):
         self.dict_sound = {}
         self.dict_sound['ms_barcode_reject'] = __ini_prc_config__.Sound.ms_barcode_reject
         self.dict_sound['ms_barcode_exist'] = __ini_prc_config__.Sound.ms_barcode_exist
-        self.dict_sound['ms_barcode_rescan_accpet'] = __ini_prc_config__.Sound.ms_barcode_rescan_accpet
+        self.dict_sound['ms_barcode_rescan_accept'] = __ini_prc_config__.Sound.ms_barcode_rescan_accept
 
     def addImageToFrame(self, frame_name, i, barcode):
         # 使用对象名找到相应的 QFrame
@@ -155,7 +155,7 @@ class BarcodeDisplay(QWidget):
         font1 = QtGui.QFont()
         font1.setPointSize(15)
                 
-        self.setWindowTitle("接收条码")
+        self.setWindowTitle("Manual Scan Client(补码客户端)")
         self.setGeometry(100, 100, 300, 200)
 
         status_front = QtGui.QFont("Arial",16)
@@ -163,7 +163,6 @@ class BarcodeDisplay(QWidget):
         self.statusbar.setFont(status_front)
         # self.caps_lock_label = QLabel("Caps Lock : OFF")
         # self.statusbar.addPermanentWidget(self.caps_lock_label)
-
         #self.pagelabel = QLabel("Current Page : 1")
         #self.statusbar.addWidget(self.pagelabel)
 
@@ -174,8 +173,8 @@ class BarcodeDisplay(QWidget):
 
         self.MAWB = QLabel("MAWB:", self)
         self.MAWB.setFont(font)
-        self.mawbcount = QLabel("xx", self)
-        self.mawbcount.setFont(font1)
+        self.mawbid = QLabel("xx", self)
+        self.mawbid.setFont(font1)
         self.STATUS = QLabel("Status:", self)
         self.STATUS.setFont(font)
         self.sysstatus = QLabel("status", self)
@@ -187,6 +186,7 @@ class BarcodeDisplay(QWidget):
         # 创建MAWB布局，HAWB布局
         self.MAWBLayout = QHBoxLayout()
         self.MAWBLayout.addWidget(self.MAWB)
+        self.MAWBLayout.addWidget(self.mawbid)
         self.MAWBLayout.addWidget(self.STATUS)
         self.MAWBLayout.addWidget(self.sysstatus)
         self.HAWBLayout = QHBoxLayout()
@@ -275,8 +275,8 @@ class BarcodeDisplay(QWidget):
         thread.daemon = True
         thread.start()
         # 最大化
-        self.showMaximized()
-        # self.showFullScreen()
+        # self.showMaximized()
+        self.showFullScreen()
         self.setFocus()
 
     def update_barcode(self, strManualScanBarcode):
@@ -317,15 +317,16 @@ class BarcodeDisplay(QWidget):
             set_reading_nr = self.inst_redis.getset("set_reading_nr")  # 更新set_reading_nr
             set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
             set_reading_gr = self.inst_redis.getset("set_reading_gr")
-            if len(set_reading_nr)+ len(set_reading_mr) == 0:
-                self.inst_logger.info(f"进入清场模式失败，NR,MR列表为空")
+            set_check_ng =self.inst_redis.getset("set_check_ng")
+            if len(set_reading_nr)+ len(set_reading_mr)+len(set_check_ng) == 0:
+                self.inst_logger.info(f"进入清场模式失败，NR,MR,NG列表全为空")
                 return
 
             # 开始进入清场模式
             # 向ms 发送清理命令，清理掉所有已扫描的补码信息
-            self.update_barcode(f"*enterclean*")
+            # self.update_barcode(f"*enterclean*")
             self.scanbarcode = ""
-            self.barcode_input = ""  # 清空当前条码
+            # self.barcode_input = ""  # 清空当前条码
 
             # 状态值更改
             self.scanned_mr.clear()
@@ -352,7 +353,9 @@ class BarcodeDisplay(QWidget):
             self.inst_redis.clearset("set_reading_nr")
             self.inst_redis.clearset("set_reading_mr")
             self.inst_redis.clearset("set_ms_nr")
-            self.inst_redis.clearset("set_ms_mr")            
+            self.inst_redis.clearset("set_ms_mr")
+            self.inst_redis.clearset("set_check_ng")
+            
 
             # 状态值更改
             self.exception_handling = 0
@@ -404,7 +407,7 @@ class BarcodeDisplay(QWidget):
                     set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 匹配多条码 更新set_reading_mr
                     if str_bc_input in set_reading_mr:  # 捕获到多条码
                         self.scanned_mr.add(str_bc_input)
-                        mixer.music.load(self.dict_sound['ms_barcode_rescan_accpet'])
+                        mixer.music.load(self.dict_sound['ms_barcode_rescan_accept'])
                         mixer.music.play()
                         self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}在多条码清单reading_mr中")
                         self.show_status(f"clean 模式：条码 {str_bc_input} 为MR条码", "#87CEEB")
@@ -412,7 +415,7 @@ class BarcodeDisplay(QWidget):
 
                     # 收到一个合格条码，但不在以上清单中，视为NR补码
                     self.scanned_nr.add(str_bc_input)
-                    mixer.music.load(self.dict_sound['ms_barcode_rescan_accpet'])
+                    mixer.music.load(self.dict_sound['ms_barcode_rescan_accept'])
                     mixer.music.play()
                     self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}不在任何清单中,视为NR补码成功")
                     self.show_status(f"clean 模式：条码 {str_bc_input} 为NoRead条码", "#87CEEB")
@@ -428,15 +431,17 @@ class BarcodeDisplay(QWidget):
         self.tableWidget.setAutoScrollMargin(16)
         self.tableWidget.setRowCount(10)
         self.tableWidget.setObjectName("tableWidget")
-        self.tableWidget.setColumnCount(4)
-        self.tableWidget.setHorizontalHeaderLabels(["条码", "X值", "Y值", "状态"])
+        self.tableWidget.setColumnCount(5)
+        self.tableWidget.setHorizontalHeaderLabels(["条码", "X值", "Y值", "scan","check"])
         self.tableWidget.horizontalHeader().setDefaultSectionSize(258)
-        self.tableWidget.setColumnWidth(0, 270)
-        self.tableWidget.setColumnWidth(1, 100)
-        self.tableWidget.setColumnWidth(2, 100)
-        self.tableWidget.setColumnWidth(3, 100)
-        # self.tableWidget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 左右滚动条
-        self.tableWidget.verticalHeader().setDefaultSectionSize(92)  # 设置行高为50像素（根据需要调整）
+        self.tableWidget.setColumnWidth(0, 220)
+        self.tableWidget.setColumnWidth(1, 90)
+        self.tableWidget.setColumnWidth(2, 90)
+        self.tableWidget.setColumnWidth(3, 90)
+        self.tableWidget.setColumnWidth(4, 80)
+        # self.tableWidget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)  # 左右滚动条
+        self.tableWidget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)  # 上下滚动条
+        self.tableWidget.verticalHeader().setDefaultSectionSize(60)  # 设置行高为50像素（根据需要调整）
         self.tableWidget.horizontalHeader().setMinimumSectionSize(31)
         # 设置整个表格为只读
         self.tableWidget.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
@@ -559,11 +564,13 @@ class BarcodeDisplay(QWidget):
                 posx_key = f"parcel:posx:{B_id}"
                 posy_key = f"parcel:posy:{B_id}"
                 scan_result_key = f"parcel:scan_result:{B_id}"
+                check_result_key = f"parcel:check_result:{B_id}"
                 # 获取对应的值
                 barcode_value = self.inst_redis.getkey(barcode_key)
                 posx_value = self.inst_redis.getkey(posx_key)
                 posy_value = self.inst_redis.getkey(posy_key)
                 scan_result_value = self.inst_redis.getkey(scan_result_key)
+                check_result_value = self.inst_redis.getkey(check_result_key)
                 if barcode_value == None and posx_value == None and posy_value == None and scan_result_value == None:
                     if key in self.uid_deque:
                         self.uid_deque.remove(key)
@@ -573,7 +580,8 @@ class BarcodeDisplay(QWidget):
                     'barcode': barcode_value,
                     'posx': posx_value,
                     'posy': posy_value,
-                    'scan_result': scan_result_value
+                    'scan_result': scan_result_value,
+                    'check_result': check_result_value
                 })
 
                 #
@@ -584,6 +592,7 @@ class BarcodeDisplay(QWidget):
                 self.tableWidget.setItem(row, 1, QTableWidgetItem(result['posx']))
                 self.tableWidget.setItem(row, 2, QTableWidgetItem(result['posy']))
                 self.tableWidget.setItem(row, 3, QTableWidgetItem(result['scan_result']))
+                self.tableWidget.setItem(row, 4, QTableWidgetItem(result['check_result']))
                 # 如果补码的值与barcode一样  将table变色
                 try:
                     if result['barcode'] == self.scanbarcode:
@@ -881,12 +890,16 @@ class BarcodeDisplay(QWidget):
             str_tp_long = self.inst_redis.getkey("tp:long")
             if str_tp_long:
                 self.tpbar.showMessage(f"流量已更新，瞬时流量 {str_tp_short} 件/小时；平均流量 {str_tp_long} 件/小时")
-            
+        set_hawb = self.inst_redis.getset("set_hawb") # 更新运单数据    
         self.NR.setText(f"NR:{len(lst_reading_nr)}")
         self.MR.setText(f"MR:{len(set_reading_mr)}")
+
         self.sysstatus.setText(f"{str_sysstatus}")
+        self.total_number.setText(f"{len(set_hawb)}")
+
         str_batchid = self.inst_redis.getkey("sys:batchid")
-        self.total_number.setText(str_batchid)
+        self.mawbid.setText(str_batchid)
+
         str_batchid_count = self.inst_redis.getkey("sys:hawb:count")
         self.hpk_number.setText(str_batchid_count)
         self.out_number.setText("0")

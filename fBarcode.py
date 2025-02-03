@@ -17,9 +17,9 @@ def barcode_formatcheck_bylst(str_barcode,lst_re_exp):
             return True
     return False
 
-def barcode_existingcheck(str_barcode,lst_hawb):
-    if str_barcode in lst_hawb:
-        print(f"Barcode {str_barcode} belong to current MAWB" )
+def barcode_existingcheck(str_barcode,set_barcode):
+    if str_barcode in set_barcode:
+        print(f"Barcode {str_barcode} belong to current set" )
         return True
-    print(f"Barcode {str_barcode} NOT belong to current MAWB")
+    print(f"Barcode {str_barcode} NOT belong to current set")
     return False

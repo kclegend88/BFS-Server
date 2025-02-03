@@ -23,16 +23,21 @@ def start_process(config_file):
             if dictdata['type'] == 'MR':
                 inst_redis.sadd("set_ms_mr", dictdata['barcode'])     
             elif dictdata['type'] == 'NR':
-                inst_redis.sadd("set_ms_nr", dictdata['barcode'])   
+                inst_redis.sadd("set_ms_nr", dictdata['barcode'])
+            elif  dictdata['type'][0:2] == 'NG':
+                inst_redis.sadd("set_check_ng_catch", dictdata['barcode'])
             else:
                 inst_logger.error("线程 %s 中, prc_stmMS_dataproc 数据时发现数据类型异常: 补码类型不为MR或NR" %(__prc_name__,))
                 continue
         lst_reading_nr = list(inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
         lst_ms_nr = list(inst_redis.getset("set_ms_nr"))            # 更新set_ms_nr       
         set_reading_mr = inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
-        set_ms_mr = inst_redis.getset("set_ms_mr")            # 更新set_ms_mr    
+        set_ms_mr = inst_redis.getset("set_ms_mr")            # 更新set_ms_mr
+        set_check_ng = inst_redis.getset("set_check_ng")  # set_check_ng
+        set_check_ng_catch = inst_redis.getset("set_check_ng_catch")  # set_check_ng_catch
         
-        if len(lst_reading_nr) + len(set_reading_mr) == 0:
+        # if len(lst_reading_nr) + len(set_reading_mr) == 0:
+        if len(lst_reading_nr) + len(set_reading_mr)  + len(set_check_ng) == 0:
             return
         # 开始逻辑判断
         # set_ms_nr 的数量，与set_reading_nr的数量一致
@@ -42,6 +47,10 @@ def start_process(config_file):
         if not set_ms_mr == set_reading_mr:
             return
         # 所有read_ng的包裹都已经被捕捉
+        inst_logger.error("线程 %s 中, mr 与 nr 条件已满足" %(__prc_name__,))
+        if not set_check_ng.issubset(set_check_ng_catch):
+            return
+
         # 将read_nr/mr中的所有包裹，从set_reading mr/nr中删除，移动到set_reading_gr中，parcel:status更改成为mr_ms或者nr_ms
 
         for i,parcel_uid in enumerate(lst_reading_nr):
@@ -49,6 +58,9 @@ def start_process(config_file):
             inst_redis.setkey(f"parcel:barcode:{parcel_uid}",lst_ms_nr[i])
             inst_redis.sadd("set_reading_gr", lst_ms_nr[i])  # 将条码加入set_reading_gr
             inst_logger.info("包裹补码成功,线程 %s 修改NR包裹状态 uid= %s, barcode =%s"%(__prc_name__,parcel_uid,lst_ms_nr[i]))
+            inst_redis.setkey(f"parcel:check_result:{parcel_uid}", '##')  # uid对应的包裹，核查结果 ##
+            inst_redis.setkey(f"parcel:ms_barcode:{lst_ms_nr[i]}",parcel_uid)  # 参照多条码读取出来的条码，对应的uid ，check ng时需要
+
         inst_redis.clearset("set_ms_nr")
         inst_redis.clearset("set_reading_nr")
         # stm_ms 清理
@@ -61,6 +73,16 @@ def start_process(config_file):
             inst_logger.info("包裹补码成功,线程 %s 修改MR包裹状态 uid= %s, barcode =%s"%(__prc_name__,parcel_uid,parcel_barcode))
         inst_redis.clearset("set_ms_mr")       
         inst_redis.clearset("set_reading_mr")
+
+        # 将check_ng中的所有包裹，从set_check_ng中删除，移动到set_check_ng_catch中
+        # parcel:check_result更改成为ng_catch
+        for parcel_barcode in enumerate(set_check_ng):
+            parcel_uid = inst_redis.getkey(f"parcel:ms_barcode:{parcel_barcode}")
+            inst_redis.setkey(f"parcel:check_result:{parcel_uid}", "NG_CT")
+            inst_redis.sadd("set_check_ng_catch", parcel_barcode)  # set_check_ng_catch
+            inst_logger.info(
+                "NG包裹捕获成功,线程 %s 修改NG包裹状态 uid= %s, barcode =%s" % (__prc_name__, parcel_uid, parcel_barcode))
+        inst_redis.clearset("set_check_ng")
 
         # 恢复输送机速度
         plc_conv_status = inst_redis.getkey("plc_conv:status")
@@ -144,7 +166,8 @@ def start_process(config_file):
         l = inst_redis.xreadgroup("stream_manualscan","manualscan","manualscan-id01")
         if len(l)>0 :                       # 收到消息
             prc_stmMS_dataproc(l[0][1])
-        # 以上为主线程操作区       
+
+        # 以上为主线程操作区
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         

@@ -266,6 +266,9 @@ class clsHIKCameraClient:
             seen = set()
             for i,item in enumerate(code):
                 if item not in seen:
+                    unique_code.append(item)
+                    seen.add(item)
+                    '''
                     bIsCodeBar = False
                     if len(item) == 12:
                         intCodeBar = -1
@@ -284,15 +287,18 @@ class clsHIKCameraClient:
                         seen.add(item)
                     else:
                         self.append_exception("check_recvbuf", f"{item} 是校验失败的条码")
+                        '''
 
             if len(unique_code) == 1 :  # 实际上不是多条码
                 dictValidData['code'] = code[0]
                 dictValidData['result'] = 'GR'
+                self.append_exception("convert_recvbuf", f"将一个条码的扫描结果由MR更改为GR!!!!")
+
                 self.lstValidData.append(dictValidData.copy())
                 self.bRecvValidData = True
                 return
             elif len(unique_code) == 0 : #有条码都不符合要求
-                self.append_exception("check_recvbuf",f"所有条码都不符合要求!!!!")
+                self.append_exception("convert_recvbuf",f"所有条码都不符合要求,舍弃MR读取结果!!!!")
                 return
             else:                        # 使用去重和校验的数据后，依然多条码
                 dictValidData['result'] = 'MR'

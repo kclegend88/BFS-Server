@@ -232,6 +232,24 @@ Update fHIKC, when receive MR, check if same barcode inside. if does, delete all
 # Rev 0.5.1
 Update tp bar in QT, modify log size of main
 
+# Rev 0.6.0
+del useless code file 
+
+Update cli_qt,cli_ms,stm_ms,stm_HIKC_data, add check code function
+
+Add OPClient, import hawb into redis 
+
+Update cli_qt, add system_status,mawb_id,mawb_count
+and check status
+
+Update stmReadingConfirm, fix bug of fail get status, (hawb:check_result-->parcel:check_result)
+change order_info_ex to order_info_check
+
+fix file name spell problem accpet-->accept
+
+
+ 
+
 
 
 

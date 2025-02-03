@@ -32,18 +32,28 @@ plc_conv:CV01:speed                # CV01的速度,0 停止 1低速 2 低中速 
 
 tp: scanner_tp_short:lu_ts        # 用于计算scanner流量的luts
 tp: scanner_tp_short:counter        # 读码报文计数器 也用于生成tp_long的辅助计数器
+tp: short						# 短期折算流量(件/小时) -10 pcs
+tp: long						# 短期折算流量(件/小时) -100 pcs
 
 parcel: barcode:<uid>            # 指定扫描uid得到的条码
 parcel: sid:<uid>                # 指定扫描uid 在stream_test中的stream id，用于后续删除stream中的对象
 parcel: posx:<uid>                # 指定扫描uid的x坐标，随PLC转动不断更新
 parcel: posy:<uid>                # 指定扫描uid的y坐标，不会更新
 parcel: scan_result:<uid>        # 指定扫描uid的扫描结果，GR/MR/NR
+parcel: check_result:<uid>		 # 指定uid的hawb核查结果；
+
+hawb:status:<barcode>			# 300-900的数值
+hawb:check_result:<barcode>		# 该单号本批次的核查结果
 
 Set:
+set_hawb						 # 当前主单下所有分单的集合
 set_process                        # 线程总清单,记录线程名称及线程id, 格式为：name=%s/id=%d
 set_reading_gr                    # 扫描结果为GR的集合
 set_reading_mr                    # 扫描结果为MR的集合
 set_reading_nr                    # 扫描结果为NR的集合
+set_check_ok						# Barcode Check 返回的正常包裹
+set_check_ng						# Barcode Check 返回的异常
+set_check_ng_catch					# Barcode Check 返回异常后，已被操作人员捕获
 
 List:
 lst_ct:<prc_name>                # 长度为10的数组，记录最近10次线程的cycle time

@@ -40,6 +40,7 @@ def start_process(config_file,__cli_id__):
     dict_sound['reading_gr']= __ini_prc_config__.Sound.reading_gr
     dict_sound['reading_nr']= __ini_prc_config__.Sound.reading_nr
     dict_sound['reading_mr']= __ini_prc_config__.Sound.reading_mr
+    dict_sound['check_ng']=__ini_prc_config__.Sound.check_ng
     
     # 增加Redis中总线程计数器，并将增加后的计数器值作为当前线程的id
     __prc_id__ = inst_redis.incrkey(f"pro_mon:prc_counter")
@@ -107,6 +108,9 @@ def start_process(config_file,__cli_id__):
                     mixer.music.play()
                 elif dictdata['result']=='NR':      # 无条码
                     mixer.music.load(dict_sound['reading_nr'])
+                    mixer.music.play()
+                elif dictdata['result'][0:2] == 'NG': # 拒绝条码
+                    mixer.music.load(dict_sound['check_ng'])
                     mixer.music.play()
         else:                                                       # 补码状态，收取HIK的读码信息，但是不播放声音，只播放补码声音
             pass
