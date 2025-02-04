@@ -115,7 +115,7 @@ def start_process(config_file):
                     conn.commit()
 
                 try:
-                    cursor.execute('SELECT count(*) from order_info_check where BATCH_ID = ?',(str_batchid,))
+                    cursor.execute('SELECT count(DISTINCT OSN) from order_info_check where BATCH_ID = ?',(str_batchid,))   # 后续需要加入运单编号去重
                     count_data = cursor.fetchall()
                     inst_logger.debug("当前测试 %s 总计包裹 %s"%(str_batchid,count_data[0][0]))
                     inst_redis.setkey("sys:hawb:count",f"{count_data[0][0]}")

@@ -247,6 +247,17 @@ change order_info_ex to order_info_check
 
 fix file name spell problem accpet-->accept
 
+# Rev 0.6.1
+Update stmReadingConfirm select distinct counter of osn
+Update stmMR,cli_ms,cli_qt, add command __clean__ force client and server end clean mode, success
+when stm_ms receive __clean__ command, even reading_mr,readig_nr, check_ng is empty, still cleanup all set and resume the conveyor
+
+Update stmHIKC_file, cli_qt, add default path to NG pic,still need further update for NG pic
+Update barcodecheck, when status = 500, if rescan, accumelate status to 501,502...
+
+Update fRedis keys, return empty list, not none to avoid unneccessary TypeError Fault
+
+ 
 
  
 

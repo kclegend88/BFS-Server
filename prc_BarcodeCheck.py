@@ -156,11 +156,12 @@ def start_process(config_file):
                     inst_logger.info("条码 %s 初始状态正常，核查结果为: %s" % (barcode, check_result))
                     # inst_redis.sadd("set_check_ng")
                     inst_redis.sadd("set_check_ok", barcode)
+                    continue
 
                 if  500 <= hawb_status< 700:  # 重复扫描
                     check_result = "RC"
                     inst_redis.setkey(f"parcel:check_result:{uid}", check_result)
-                    inst_redis.setkey(f"hawb:status:{barcode}", '599')  # 暂时写599 区分于 500
+                    inst_redis.setkey(f"hawb:status:{barcode}", f"{hawb_status+1}")  # 记录重复次数
                     inst_logger.info("条码 %s 重复上机,结果为: %s"%( barcode, check_result))
                     # inst_redis.sadd("set_check_ng")
                     inst_redis.sadd("set_check_ok",barcode)     # 后续在此处加入ini文件判断，rc是否判ng

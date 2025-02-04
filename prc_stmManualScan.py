@@ -14,6 +14,7 @@ from fHIKCamera import clsHIKCameraClient
 
 def start_process(config_file):
     def prc_stmMS_dataproc(lstdata):
+        bCleanMode = False
         for i,dictdata in l[0][1]:             # 遍历收到的所有消息
             # inst_redis.sadd("set_ms", dictdata['barcode'])     # 将条码加入set_manualscan
             # 将条码发送给barcode check 模块
@@ -26,6 +27,10 @@ def start_process(config_file):
                 inst_redis.sadd("set_ms_nr", dictdata['barcode'])
             elif  dictdata['type'][0:2] == 'NG':
                 inst_redis.sadd("set_check_ng_catch", dictdata['barcode'])
+            elif dictdata['barcode'] == '__clean__':
+                inst_logger.error(
+                    "线程 %s 中, prc_stmMS_dataproc 数据时收到客户端发来的离开清场模式的指令" % (__prc_name__,))
+                bCleanMode = True
             else:
                 inst_logger.error("线程 %s 中, prc_stmMS_dataproc 数据时发现数据类型异常: 补码类型不为MR或NR" %(__prc_name__,))
                 continue
@@ -37,19 +42,23 @@ def start_process(config_file):
         set_check_ng_catch = inst_redis.getset("set_check_ng_catch")  # set_check_ng_catch
         
         # if len(lst_reading_nr) + len(set_reading_mr) == 0:
-        if len(lst_reading_nr) + len(set_reading_mr)  + len(set_check_ng) == 0:
-            return
-        # 开始逻辑判断
-        # set_ms_nr 的数量，与set_reading_nr的数量一致
-        if not len(lst_ms_nr)== len(lst_reading_nr):
-            return
-        # set_ms_mr 的 set_reading_mr 完全一致
-        if not set_ms_mr == set_reading_mr:
-            return
-        # 所有read_ng的包裹都已经被捕捉
-        inst_logger.error("线程 %s 中, mr 与 nr 条件已满足" %(__prc_name__,))
-        if not set_check_ng.issubset(set_check_ng_catch):
-            return
+        if not bCleanMode:
+            if len(lst_reading_nr) + len(set_reading_mr)  + len(set_check_ng) == 0:
+                return
+            # 开始逻辑判断
+            # set_ms_nr 的数量，与set_reading_nr的数量一致
+            if not len(lst_ms_nr)== len(lst_reading_nr):
+                return
+            # set_ms_mr 的 set_reading_mr 完全一致
+            if not set_ms_mr == set_reading_mr:
+                return
+            # 所有read_ng的包裹都已经被捕捉
+            inst_logger.error("线程 %s 中, mr 与 nr 条件已满足" %(__prc_name__,))
+            inst_logger.error("线程 %s 中, 查询得到 set_check_ng = %s 与set_check_ng_catch = %s" % (__prc_name__,set_check_ng,set_check_ng_catch))
+            if not set_check_ng.issubset(set_check_ng_catch):
+                return
+        else:
+            inst_logger.error("线程 %s 中, 离开清场模式并清理所有数据" % (__prc_name__,))
 
         # 将read_nr/mr中的所有包裹，从set_reading mr/nr中删除，移动到set_reading_gr中，parcel:status更改成为mr_ms或者nr_ms
 

@@ -100,6 +100,9 @@ def start_process(config_file):
                     path = ErrRead_path
                     order_path = ErrTarget_path
                     uid = uid[:-2]
+                else:			# 对于其他场景，比如NG，暂时使用默认的GR目录
+                    path = AIRead_path
+                    order_path = AITarget_path
                 # 用uid去指定文件夹下获取对应的图片
                 # 先构建 图片路径 获取当前日期
                 now = datetime.now()

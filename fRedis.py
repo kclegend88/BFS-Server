@@ -189,12 +189,13 @@ class clsRedis:
 
     
     def keys(self, prefix):
-        # 查询key-value 键对值
+        # 查询以prefix开头的所有key，返回key的list
+        # 使用scan 命令，每次取得至多100个key，发现未取完，立刻接着取，直到取完为止
         if self.__isconnected__:
             value = self.decoded_connection.scan(match=f"{prefix}*",count = 100)
             if value[1] is None:
                 # ToDo 后续为redis建立私有logger，查询到空键对值时logger.debug
-                return None
+                return list()   # 返回None会导致后续的所有循环和取得len的函数报错，改为返回空list
             else:
                 result = value[1].copy()
                 while not int(value[0]) == 0:
