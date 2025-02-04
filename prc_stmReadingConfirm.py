@@ -1,6 +1,8 @@
 # prc_template  v 0.2.0
 import time
 import datetime
+import traceback
+
 from fLog import clsLogger
 from fConfig import clsConfig
 from fConfigEx import clsConfigEx
@@ -45,12 +47,17 @@ def start_process(config_file):
     
     # --------------------    
     # 以下为定制初始化区域
-    
-    if not inst_redis.xcreategroup("stream_reading_confirm", "ReadingConfirm"):
-        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("ReadingConfirm",))
+    REST = inst_redis.xcreategroup("stream_reading_confirm", "ReadingConfirm")
+    if REST :   # 返回值不为空，说明异常信息
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在， %s " %("ReadingConfirm", REST))
+        for i, e in enumerate(inst_redis.lstException):
+            inst_logger.error(
+                "线程 %s 运行过程中发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+        inst_redis.lstException.clear()
     else:
-        inst_logger.info("线程 %s 注册stream组成功" %("ReadingConfirm",))
-    
+        inst_logger.info("线程 %s 注册stream组成功, %s " %("ReadingConfirm",REST))
+
     b_thread_running = True
     int_exit_code = 0
     
@@ -60,12 +67,15 @@ def start_process(config_file):
     cursor = conn.cursor()
     # 创建订单表格
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS order_info (
+        CREATE TABLE IF NOT EXISTS order_info_check (
             UID INTEGER PRIMARY KEY AUTOINCREMENT,  -- 编号
             OSN TEXT NOT NULL,  
             TS TEXT,
             SR TEXT,
-            TEST_ID TEXT
+            TEST_ID TEXT,
+            BATCH_ID TEXT,
+            STATUS TEXT,
+            CHECK_RESULT TEXT
         )
     """)    
     while b_thread_running:
@@ -79,19 +89,39 @@ def start_process(config_file):
         if len(l)>0 :                       # 收到消息
             # print(l)                        # Only for debug
             inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
+            str_batchid=inst_redis.getkey("sys:batchid")
             for i,dictdata in l[0][1]:             # 遍历收到的所有消息
                 try:
-                    cursor.execute('INSERT INTO order_info (OSN,TS,SR,TEST_ID) VALUES (?,?,?,?)',
-                           (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))
+                    hawb_status = inst_redis.getkey(f"hawb:status:{dictdata['barcode']}")
+                    if not hawb_status:
+                        inst_logger.error("本单状态值为空,单号 %s" %(dictdata['barcode'],))
+                        hawb_status = "***"
+                    hawb_check =  inst_redis.getkey(f"parcel:check_result:{dictdata['uid']}")
+                    if not hawb_check:
+                        inst_logger.error("本单核查结果为空,单号 %s" %(dictdata['barcode'],))
+                        hawb_check = "*OK*"
+
+                    cursor.execute('INSERT INTO order_info_check (OSN,TS,SR,TEST_ID,BATCH_ID,STATUS,CHECK_RESULT) VALUES (?,?,?,?,?,?,?)',
+                           (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid'],str_batchid,hawb_status,hawb_check))
                     # Only for debug
-                    inst_logger.debug("SQLite DB 写入成功,条码 %s,时间戳 %s,扫描结果 %s, 扫描ID %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))        
+                    inst_logger.debug("SQLite DB 写入成功,条码 %s,时间戳 %s, 扫描结果 %s, 扫描ID %s， 状态为 %s， 核查结果为 %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid'],hawb_status,hawb_check))
                     # Only for debug
+                    inst_redis.sadd("set_reading_confirm", dictdata['barcode'])  # 将条码加入set_reading_confirm
+
                 except sqlite3.IntegrityError:
                     inst_logger.debug("SQLite DB 写入失败！！,条码 %s,时间戳 %s,扫描结果 %s, 扫描ID %s" %(dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid']))  
                 
                 finally:
                     conn.commit()
-                
+
+                try:
+                    cursor.execute('SELECT count(DISTINCT OSN) from order_info_check where BATCH_ID = ?',(str_batchid,))   # 后续需要加入运单编号去重
+                    count_data = cursor.fetchall()
+                    inst_logger.debug("当前测试 %s 总计包裹 %s"%(str_batchid,count_data[0][0]))
+                    inst_redis.setkey("sys:hawb:count",f"{count_data[0][0]}")
+                except:
+                    inst_logger.debug("SQLite DB 读取计数失败"+traceback.format_exc())
+
         # --------------------
         time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
         
@@ -108,7 +138,8 @@ def start_process(config_file):
         prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
         if prc_run_lock is None:  
             # --------------------
-            # 以下为定制区域，用于中止线程内创建的线程或调用的函数            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            # 以下为定制区域，用于中止线程内创建的线程或调用的函数            
+            inst_redis.xdelgroup("stream_test", "HIKC_data")
             for i, e in enumerate(inst_redis.lstException):
                 inst_logger.error(
                     "线程 %s 超时退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
@@ -126,13 +157,13 @@ def start_process(config_file):
         if prc_run_lock == "exit":
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
-            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            inst_redis.xdelgroup("stream_reading_confirm", "ReadingConfirm")
             for i, e in enumerate(inst_redis.lstException):
                 inst_logger.error(
                     "线程 %s 超时退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
                     % (__prc_name__,e['module'], e['timestamp'], e['msg']))
             inst_redis.lstException.clear()
-            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
+            inst_logger.info("线程 %s 删除stream组 %s 成功" %(__prc_name__,"ReadingConfirm"))
 
             int_exit_code = 2          
             break

@@ -19,6 +19,9 @@ from prc_stmHIKC_data import start_process as start_stmHIKC_data
 from prc_stmManualScan import start_process as start_stmManualScan
 from prc_stmReadingConfirm import start_process as start_stmReadingConfirm
 from prc_monitor_new import start_process as start_monitor
+from prc_stmHIKC_file import start_process as start_stmHIKC_file
+from prc_stmReadingConfirm_dss import start_process as start_stmReadingConfirm_dss
+from prc_BarcodeCheck import start_process as start_BarcodeCheck
 
 class main:
     def __init__(self):
@@ -26,9 +29,9 @@ class main:
         self.__version__='0.1.0'
         self.status = 127       # 初创建 状态为 127
         # 定义线程总表，所有在该表格中的线程由main启动并监控
-        self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan","PLC"]
-#        self.lst_thread_name = ["stmHIKC_data","stmReadingConfirm","stmManualScan"]
-        
+        self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan","PLC", "stmHIKC_file","BarcodeCheck"]
+        #self.lst_thread_name = ["HIKCamera","stmHIKC_data","stmReadingConfirm","stmManualScan","PLC", "stmHIKC_file","BarcodeCheck"]
+
 
     def run(self):
         # 创建配置ini、log、redis实例
@@ -80,6 +83,9 @@ class main:
         
         self.inst_redis.setkey(f"sys:ready", "true") # 向Redis标注主程序已运行
         self.status = 122  # 实例注册成功，状态为 122
+        # 所有线程启动前，系统进入idle状态
+        self.inst_redis.setkey(f"sys:status","idle")
+        
         # 尝试启动线程
         lst_thread =[]
         try:
@@ -96,7 +102,8 @@ class main:
         except Exception as e:
             self.inst_logger.error ("线程启动失败"+traceback.format_exc())
             sys.exit(122)               # 启动线程时发生异常
-        
+
+
         # 启动监控线程
         self.prc_mon_thread = threading.Thread(target=globals().get("start_monitor"), args=(ini_config,lst_thread),name="start_monitor")
         self.prc_mon_thread.start()
@@ -104,7 +111,10 @@ class main:
         # 打印所有线程名称
         for i,th in enumerate(lst_thread):
             print(th.getName())
+
+        time.sleep(3)
         
+        self.inst_redis.setkey("sys:batchid","0130T01B2")
         while True:
             strInput = input("Type 'Y' and press enter if you want to exit...: ")
             if strInput == 'Y':
@@ -134,6 +144,7 @@ if __name__ == '__main__':
         print(traceback.format_exc())
         if app.status < 125:    # 清理单一实例锁
             app.inst_redis.setkey(f"sys:ready", "false")
+            app.inst_logger.info("sys:ready 已清除, sys status = %d"@(app.status))
     except Exception as e:
         print("其他异常")
         print(e)

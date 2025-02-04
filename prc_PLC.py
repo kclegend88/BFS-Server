@@ -28,7 +28,9 @@ def start_process(config_file):
                 time.sleep(3)
 
     def prc_PLC_startconv():        # 启动输送机，只要command收到start 即执行
-        nonlocal __inst_plc__,inst_redis,plc_conv_command,plc_conv_status,plc_conv_fullspeed
+        nonlocal __inst_plc__,inst_redis
+        plc_conv_status = inst_redis.getkey("plc_conv:status")
+        plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
         if plc_conv_status == 'run' and plc_conv_fullspeed == 'yes': # 已启动，高速，记录逻辑错误
             inst_logger.error("线程 %s 高速时收到启动信号" % (__prc_name__,))
             inst_redis.clearkey('plc_conv:command') # 报错后删除command,避免重复执行 
@@ -43,7 +45,8 @@ def start_process(config_file):
         inst_redis.clearkey('plc_conv:command')             # 执行后删除command,确保执行一次
 
     def prc_PLC_stopconv():         # 停止输送机，只要command收到stop 即执行
-        nonlocal __inst_plc__,inst_redis,plc_conv_command,plc_conv_status,plc_conv_fullspeed
+        nonlocal __inst_plc__,inst_redis
+        plc_conv_status = inst_redis.getkey("plc_conv:status")
         if plc_conv_status == 'pause':  # 已停止，记录逻辑错误
             inst_logger.error("线程 %s 停止时收到停机信号" % (__prc_name__,))
             inst_redis.clearkey('plc_conv:command') # 报错后删除command,避免重复执行            
@@ -61,7 +64,8 @@ def start_process(config_file):
     # 如果输送机已经高速了，说明软件设计的逻辑出现问题，
     # prc_PLC_autospeedup程序段应记录内部逻辑错
     def prc_PLC_autospeedup():        
-        nonlocal __inst_plc__,inst_redis,plc_conv_command,plc_conv_status,plc_conv_fullspeed
+        nonlocal __inst_plc__,inst_redis
+        plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
         if plc_conv_fullspeed == 'yes':             # 已高速，记录逻辑错误
             inst_logger.error("线程 %s 高速时收到加速信号" % (__prc_name__,))
             inst_redis.clearkey('plc_conv:command') # 报错后删除command,避免重复执行             
@@ -80,7 +84,9 @@ def start_process(config_file):
     # 如果输送机执行slowndown指令时，发现输送机已经是低速或停机了，说明软件设计的逻辑出现问题，
     # prc_PLC_autoslowdown程序段应记录内部逻辑错误
     def prc_PLC_autoslowdown():         
-        nonlocal __inst_plc__,inst_redis,plc_conv_command,plc_conv_status,plc_conv_fullspeed
+        nonlocal __inst_plc__,inst_redis
+        plc_conv_status = inst_redis.getkey("plc_conv:status")
+        plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
         if plc_conv_status == 'run' and plc_conv_fullspeed == 'countdown':# 已减速，记录逻辑错误
             inst_logger.error("线程 %s 低速时收到减速信号" % (__prc_name__,))
             inst_redis.clearkey('plc_conv:command') # 报错后删除command,避免重复执行            
@@ -113,7 +119,9 @@ def start_process(config_file):
     # 如果调用时发现输送机处于高速，或者已经停机，说明软件设计的逻辑出现问题，
     # prc_PLC_autostop程序段应记录内部逻辑错误
     def prc_PLC_autostop():         # 自动降速，根据fullspeed过期及当前状态，决定是否执行
-        nonlocal __inst_plc__,inst_redis,plc_conv_command,plc_conv_status,plc_conv_fullspeed
+        nonlocal __inst_plc__,inst_redis
+        plc_conv_status = inst_redis.getkey("plc_conv:status")
+        plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
         if plc_conv_status == 'run' and plc_conv_fullspeed == 'yes': # 高速，记录逻辑错误
             inst_logger.error("线程 %s 高速时收到自动停止信号" % (__prc_name__,))
             inst_redis.clearkey('plc_conv:command') # 报错后删除command,避免重复执行 
@@ -164,11 +172,18 @@ def start_process(config_file):
             str_result = inst_redis.getkey(f"parcel:scan_result:{str_uid}")
             str_barcode = inst_redis.getkey(f"parcel:barcode:{str_uid}")
 
-            if not str_result in ['GR','MR_MS','NR_MS']:    # 有异常包裹流出
-               inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}") 
+            inst_redis.clearkey(f"{key}")
+            inst_redis.clearkey(f"parcel:posy:{str_uid}")
+            inst_redis.clearkey(f"parcel:sid:{str_uid}")
+            inst_redis.clearkey(f"parcel:scan_result:{str_uid}")
+            inst_redis.clearkey(f"parcel:barcode:{str_uid}")
+            inst_logger.debug(f"包裹已经离开CV03,uid={str_uid},barcode={str_barcode}")
+
+            if not str_result in ['GR','MR_MS','NR_MS','MS_AS']:    # 有异常包裹流出
+               inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}")
                # 发送停线指令
                # prc_PLC_autostop() 
-               continue
+               continue     # 非正常包裹的信息不发送给stm_reading_confirm
             # 包裹正常流出
             dict_reading_con['uid'] = str_uid
             dict_reading_con['ts'] = datetime.datetime.now().isoformat()
@@ -179,13 +194,7 @@ def start_process(config_file):
 
             inst_redis.xadd( "stream_reading_confirm", dict_reading_con)      # 插入stream
             # 清理redis中CV03上的包裹信息
-            inst_redis.clearkey(f"{key}")
-            inst_redis.clearkey(f"parcel:posy:{str_uid}")
-            inst_redis.clearkey(f"parcel:sid:{str_uid}")
-            inst_redis.clearkey(f"parcel:scan_result:{str_uid}")
-            inst_redis.clearkey(f"parcel:barcode:{str_uid}")
-            # inst_redis 
-            inst_logger.debug(f"包裹已经离开CV03,uid={str_uid},barcode={str_barcode}") 
+            # inst_redis
 
     __prc_name__="PLC"                      ### 需手动配置成线程名称
     
@@ -251,8 +260,10 @@ def start_process(config_file):
     plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")   
 
     if __ini_start_conv:            #根据配置文件决定，是否直接启动输送机
-        prc_PLC_startconv()
-    # 以上为定制初始化区域           
+        inst_redis.setkey("plc_conv:command","start")
+        inst_redis.setkey("sys:status", "normal")
+
+    # 以上为定制初始化区域
     # --------------------    
 
     # 主线程变量初始化：启动变量，退出返回值
@@ -262,6 +273,36 @@ def start_process(config_file):
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
+        time.sleep(__prc_cycletime / 1000.0)  # 所有时间均以ms形式存储
+
+        # 线程运行时间与健康程度判断
+        inst_redis.ct_refresh(__prc_name__)
+
+        # 根据输送机速度计算包裹位置，判断包裹是否离开CV03
+
+        # 线程是否继续运行的条件判断
+
+        # 如线程运行锁过期或被从外部删除，则退出线程
+        prc_run_lock = inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
+        if prc_run_lock is None:
+            # --------------------
+            # 以下为定制区域，用于中止线程内创建的线程或调用的函数
+            prc_PLC_stopconv()
+            time.sleep(3)
+            # 以上为定制区域，用于中止线程内创建的线程或调用的函数
+            # --------------------
+            int_exit_code = 1
+            break
+
+        # 如command区收到退出命令，根据线程类型决定是否立即退出
+        prc_run_lock = inst_redis.getkey(f"pro_mon:{__prc_name__}:command")
+        if prc_run_lock == "exit":
+            # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
+            # 如有则暂缓退出，如没有立即退出
+            prc_PLC_stopconv()
+            time.sleep(3)
+            int_exit_code = 2
+            break
         # --------------------
         # 以下为主线程操作区
         
@@ -280,7 +321,13 @@ def start_process(config_file):
         if plc_conv_command == "stop":      
             prc_PLC_stopconv()
             continue
-            
+
+        # 输送机强制停止，命令来自于外部客户端或main退出时的指令
+        # sys_status = inst_redis.getkey("sys:status")
+        # if plc_conv_command == "stop":
+        #    prc_PLC_stopconv()
+        #    continue
+
         # 输送机自动减速，来自读码线程
         if plc_conv_command == "autoslowdown":  
             prc_PLC_autoslowdown()
@@ -296,39 +343,23 @@ def start_process(config_file):
         if not plc_conv_fullspeed:
             if not plc_conv_status=='pause':
                 prc_PLC_autostop()
-            
+                inst_redis.setkey("sys:status","stop")
+
+        # 在client中，sys:status被修改为resume, server中，PLC线程将resume执行成start
+        str_sys_status = inst_redis.getkey("sys:status")
+        if str_sys_status == "resume":    # resume状态,重启输送机
+            inst_logger.info("线程 %s 中, 收到resume 清场模式的指令" %(__prc_name__,))
+            # 判断PLC状态
+            if plc_conv_status != 'pause':
+                inst_logger.error("线程 %s 在收到resume命令时发现输送机速度状态异常" % (__prc_name__,))
+                inst_redis.setkey("sys:status","normal")
+                continue
+            inst_redis.setkey("sys:status", "normal")
+            inst_logger.info("成功退出清场模式，线程 %s 尝试重新启动输送机" % (__prc_name__,))
+            prc_PLC_startconv()
+        
         # 以上为主线程操作区       
         # --------------------
-        time.sleep(__prc_cycletime/1000.0)  # 所有时间均以ms形式存储
-        
-        # 线程运行时间与健康程度判断
-        inst_redis.ct_refresh(__prc_name__)
-       
-        # 根据输送机速度计算包裹位置，判断包裹是否离开CV03
-        
-        # 线程是否继续运行的条件判断
-        
-        #如线程运行锁过期或被从外部删除，则退出线程
-        prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:run_lock")
-        if prc_run_lock is None:  
-            # --------------------
-            # 以下为定制区域，用于中止线程内创建的线程或调用的函数
-            prc_PLC_stopconv()
-            time.sleep(3)
-            # 以上为定制区域，用于中止线程内创建的线程或调用的函数           
-            # --------------------
-            int_exit_code = 1
-            break
-        
-        #如command区收到退出命令，根据线程类型决定是否立即退出
-        prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:command")
-        if prc_run_lock == "exit":
-            # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
-            # 如有则暂缓退出，如没有立即退出
-            prc_PLC_stopconv()
-            time.sleep(3)
-            int_exit_code = 2
-            break
-    
+
     inst_logger.info("线程 %s 已退出，返回代码为 %d" %(__prc_name__,int_exit_code))
 

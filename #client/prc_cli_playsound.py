@@ -40,6 +40,7 @@ def start_process(config_file,__cli_id__):
     dict_sound['reading_gr']= __ini_prc_config__.Sound.reading_gr
     dict_sound['reading_nr']= __ini_prc_config__.Sound.reading_nr
     dict_sound['reading_mr']= __ini_prc_config__.Sound.reading_mr
+    dict_sound['check_ng']=__ini_prc_config__.Sound.check_ng
     
     # 增加Redis中总线程计数器，并将增加后的计数器值作为当前线程的id
     __prc_id__ = inst_redis.incrkey(f"pro_mon:prc_counter")
@@ -71,11 +72,18 @@ def start_process(config_file,__cli_id__):
     # 初始化pygame.mixer
     pygame.mixer.init()
     
-    if not inst_redis.xcreategroup("stream_test", __prc_name__):
-        inst_logger.info("线程 %s 注册stream组失败，该组已存在" %("__prc_name__",))
+    REST = inst_redis.xcreategroup("stream_test", __prc_name__)
+    if REST :   # 返回值不为空，说明异常信息
+        inst_logger.info("线程 %s 注册stream组失败，该组已存在， %s " %(__prc_name__, REST))
+        for i, e in enumerate(inst_redis.lstException):
+            inst_logger.error(
+                "线程 %s 运行过程中发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+        inst_redis.lstException.clear()
     else:
-        inst_logger.info("线程 %s 注册stream组成功" %("__prc_name__",))
-    
+        inst_logger.info("线程 %s 注册stream组成功, %s " %(__prc_name__,REST))
+
+
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock",__prc_id__,__prc_expiretime)
@@ -86,19 +94,24 @@ def start_process(config_file,__cli_id__):
         lst_reading_nr = list(inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
         set_reading_mr = inst_redis.getset("set_reading_mr")        # 更新set_reading_mr
         l = inst_redis.xreadgroup("stream_test",__prc_name__,"cliplay-id01")
-        if len(lst_reading_nr) + len(set_reading_mr) == 0:          # 正常状态，读取 stream_test, 每收到一个gr 播放一个声音l
-            if len(l)>0:                                # 收到消息
-                inst_logger.info("收到序列 %s 中的消息累计 %d 行" %(l[0][0],len(l[0][1])))
-                for i,dictdata in l[0][1]:              # 遍历收到的所有消息
-                    if dictdata['result']=='GR':        # 正常识读
+        #if len(lst_reading_nr) + len(set_reading_mr) == 0:          # 正常状态，读取 stream_test, 每收到一个gr 播放一个声音l
+        if len(l)>0:                                # 收到消息
+            str_sysstatus = inst_redis.getkey("sys:status")
+            inst_logger.info("收到序列 %s 中的消息累计 %d 行, 系统状态 %s " %(l[0][0],len(l[0][1]),str_sysstatus))
+            for i,dictdata in l[0][1]:              # 遍历收到的所有消息
+                if dictdata['result']=='GR':        # 正常识读
+                    if str_sysstatus == "normal":
                         mixer.music.load(dict_sound['reading_gr'])
                         mixer.music.play()
-                    elif dictdata['result']=='MR':      # 多条码
-                        mixer.music.load(dict_sound['reading_mr'])
-                        mixer.music.play()
-                    elif dictdata['result']=='NR':      # 无条码    
-                        mixer.music.load(dict_sound['reading_nr'])
-                        mixer.music.play()                        
+                elif dictdata['result']=='MR':      # 多条码
+                    mixer.music.load(dict_sound['reading_mr'])
+                    mixer.music.play()
+                elif dictdata['result']=='NR':      # 无条码
+                    mixer.music.load(dict_sound['reading_nr'])
+                    mixer.music.play()
+                elif dictdata['result'][0:2] == 'NG': # 拒绝条码
+                    mixer.music.load(dict_sound['check_ng'])
+                    mixer.music.play()
         else:                                                       # 补码状态，收取HIK的读码信息，但是不播放声音，只播放补码声音
             pass
             
@@ -132,15 +145,20 @@ def start_process(config_file,__cli_id__):
             break
         
         #如command区收到退出命令，根据线程类型决定是否立即退出
-        prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:command")
+        prc_run_lock=inst_redis.getkey(f"sys:cli{__cli_id__:02}:command")
         if prc_run_lock == "exit":
+            inst_logger.info("线程 %s 已收到退出信号" %(__prc_name__,))
+            inst_redis.xdelgroup("stream_test", __prc_name__)
+            inst_logger.info("线程 %s 删除stream组成功" %(__prc_name__,))
+            for i, e in enumerate(inst_redis.lstException):
+                inst_logger.error(
+                    "线程 %s 受控退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
+                    % (__prc_name__,e['module'], e['timestamp'], e['msg']))
+            inst_redis.lstException.clear()
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
             int_exit_code = 2           
             break
-    inst_redis.clearkey(f"pro_mon:{__prc_name__}-%02d:run_lock"%(__cli_id__,))
+    inst_redis.clearkey(f"pro_mon:{__prc_name__}:run_lock")
     inst_logger.info("线程 %s 已退出，返回代码为 %d" %(__prc_name__,int_exit_code))
-
-
-
 

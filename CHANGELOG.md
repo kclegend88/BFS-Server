@@ -183,3 +183,87 @@ Update stmManualScan, add redis exception print function,and exit function
 Update stmReadingConfirm from template 2.0-->3.0
 
 Add cli_qt, show parcel position and list, testing
+
+# Rev 0.3.3
+Update main_cli, add lst_thread, add exit code, add prc join, send syc:cli<xx>:comannd by "exit“ and clean sys：cli<xx>:ready
+
+Update cli_ms to template 0.3, fix can not exit bug, add exit code and delete xgroup
+update all stm relative py file, modified all xgroupcreate code , rest = none means no prolbem...，add exit code for xgroup delete
+fix some group name fault
+
+Add function for parcel position shown, on cli_qt
+
+# Rev 0.4.0
+Add stmHIKC_file, update main_cli_qt, Client show picture on the screen.direction and sequence config by ini file.
+
+Update cli_ms, if set_reading_mr/nr is empty, do nothing.
+	Maybe some bug, rest sentence will never run...
+
+Temporary disable len = 0 clause in playsound. some bug may happen.
+
+Dec stmHIKC_data CT from 1000 to 300,speed up to match high throughput
+
+# Rev 0.4.1
+Update fBarcode , and barcode_formatcheck_bylist, no test yet
+Add stm_ReadingConfirm_dss, sync data with dss server
+Update prc_PLC, main_cli_qt,stm_HIKC_data, add MS_AS function, manual scan after stop. manually solve stuck issue
+Fix bug of manusal scan, after nr_ms and mr_ms, barcode should add into set_reading_gr
+
+# Rev 0.4.2
+Update cli_qt, ms_as mode, not all test success
+
+# Rev 0.5.0
+Update stm_ReadingConfirm, check db to order_info_ex,add batch_id for test;
+select same batch_id and keep update count into redis sys:hawb:count
+Update main,stm_ms,stm_hikc for sys:status,startup with 'idle', start run change to 'normal',find nr or mr change to 'alert', not ms on time(conveyor pause) change to 'stop', scan *enterclean* change to 'clean', scan  *endclean* change to normal
+
+when status is not 'normal', sound and pic will not apply to normal parcel, only nr or mr.
+
+Update client_qt,rewrith key_event.add code for enter and end clean mode, during clean mode no action really done(later need to add manual scan), when end clean mode, clean all nr,mr,ms_nr,ms_mr set, restart conv
+
+add statusbar, show enter and leave clean mode; during clean mode show status and scanned barcode
+fix bug of remover from deque
+change ftp server to filezilla, ftp user ftp, no password
+
+Update prc_plc, fix bug for posx still in list; delete posx before check parcel valid.if invalid parcel leave conveyor, only warning; 
+add resume function, when endclean , conv resume when sys:status change to 'resume', after conv start, sys:status change to 'normal'
+
+Update fHIKC, when receive MR, check if same barcode inside. if does, delete all same barcode.
+# Rev 0.5.1
+Update tp bar in QT, modify log size of main
+
+# Rev 0.6.0
+del useless code file 
+
+Update cli_qt,cli_ms,stm_ms,stm_HIKC_data, add check code function
+
+Add OPClient, import hawb into redis 
+
+Update cli_qt, add system_status,mawb_id,mawb_count
+and check status
+
+Update stmReadingConfirm, fix bug of fail get status, (hawb:check_result-->parcel:check_result)
+change order_info_ex to order_info_check
+
+fix file name spell problem accpet-->accept
+
+# Rev 0.6.1
+Update stmReadingConfirm select distinct counter of osn
+Update stmMR,cli_ms,cli_qt, add command __clean__ force client and server end clean mode, success
+when stm_ms receive __clean__ command, even reading_mr,readig_nr, check_ng is empty, still cleanup all set and resume the conveyor
+
+Update stmHIKC_file, cli_qt, add default path to NG pic,still need further update for NG pic
+Update barcodecheck, when status = 500, if rescan, accumelate status to 501,502...
+
+Update fRedis keys, return empty list, not none to avoid unneccessary TypeError Fault
+
+ 
+
+ 
+
+
+
+
+
+
+
