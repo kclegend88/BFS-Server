@@ -1,0 +1,94 @@
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:26,982]_[MainThread]_[main.py/main.32]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:26,982]_[MainThread]_[main.py/main.42]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:26,991]_[MainThread]_[main.py/main.55]_Redis 连接成功__
+__[ERROR]_[HND.BRS01]_[2025-02-11 11:03:26,991]_[MainThread]_[main.py/main.60]_已有程序运行中，本程序将退出！！！__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,663]_[MainThread]_[main.py/main.32]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,664]_[MainThread]_[main.py/main.42]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,673]_[MainThread]_[main.py/main.55]_Redis 连接成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,674]_[MainThread]_[main.py/main.64]_单一实例确认成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,762]_[MainThread]_[main.py/main.67]_Redis 数据清理成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,762]_[MainThread]_[main.py/main.85]_主程序尝试启动线程: start_PLC_read__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,763]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.36]_线程 PLC_read 正在启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,819]_[PLC_read]_[__init__.py/__init__.73]_creating snap7 client__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,819]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.65]_线程PLC_read尝试连接 PLC__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:43,819]_[PLC_read]_[__init__.py/__init__.190]_connecting to 192.168.18.160:102 rack 0 slot 1__
+__[DEBUG]_[HND.BRS01]_[2025-02-11 11:03:43,819]_[PLC_read]_[__init__.py/__init__.877]_setting param number 2 to 102__
+__[DEBUG]_[HND.BRS01]_[2025-02-11 11:03:44,010]_[PLC_read]_[common.py/common.107]_error text for 0x2751__
+__[ERROR]_[HND.BRS01]_[2025-02-11 11:03:44,010]_[PLC_read]_[common.py/common.88]_b' TCP : Unreachable peer'__
+__[ERROR]_[HND.BRS01]_[2025-02-11 11:03:44,011]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.27]_线程 PLC PLC连接失败，三秒后重连__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:44,775]_[MainThread]_[main.py/main.91]_主程序已尝试启动全部线程，共计 1 个__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:47,011]_[PLC_read]_[__init__.py/__init__.190]_connecting to 192.168.18.160:102 rack 0 slot 1__
+__[DEBUG]_[HND.BRS01]_[2025-02-11 11:03:47,011]_[PLC_read]_[__init__.py/__init__.877]_setting param number 2 to 102__
+__[DEBUG]_[HND.BRS01]_[2025-02-11 11:03:47,513]_[PLC_read]_[common.py/common.107]_error text for 0x2751__
+__[ERROR]_[HND.BRS01]_[2025-02-11 11:03:47,514]_[PLC_read]_[common.py/common.88]_b' TCP : Unreachable peer'__
+__[ERROR]_[HND.BRS01]_[2025-02-11 11:03:47,514]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.27]_线程 PLC PLC连接失败，三秒后重连__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:03:50,515]_[PLC_read]_[__init__.py/__init__.190]_connecting to 192.168.18.160:102 rack 0 slot 1__
+__[DEBUG]_[HND.BRS01]_[2025-02-11 11:03:50,515]_[PLC_read]_[__init__.py/__init__.877]_setting param number 2 to 102__
+__[DEBUG]_[HND.BRS01]_[2025-02-11 11:03:51,013]_[PLC_read]_[common.py/common.107]_error text for 0x2751__
+__[ERROR]_[HND.BRS01]_[2025-02-11 11:03:51,013]_[PLC_read]_[common.py/common.88]_b' TCP : Unreachable peer'__
+__[ERROR]_[HND.BRS01]_[2025-02-11 11:03:51,013]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.27]_线程 PLC PLC连接失败，三秒后重连__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:03,258]_[MainThread]_[main.py/main.32]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:03,258]_[MainThread]_[main.py/main.42]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:03,266]_[MainThread]_[main.py/main.55]_Redis 连接成功__
+__[ERROR]_[HND.BRS01]_[2025-02-11 11:04:03,267]_[MainThread]_[main.py/main.60]_已有程序运行中，本程序将退出！！！__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,719]_[MainThread]_[main.py/main.32]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,720]_[MainThread]_[main.py/main.42]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,729]_[MainThread]_[main.py/main.55]_Redis 连接成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,729]_[MainThread]_[main.py/main.64]_单一实例确认成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,776]_[MainThread]_[main.py/main.67]_Redis 数据清理成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,777]_[MainThread]_[main.py/main.85]_主程序尝试启动线程: start_PLC_read__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,778]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.36]_线程 PLC_read 正在启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,783]_[PLC_read]_[__init__.py/__init__.73]_creating snap7 client__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:12,783]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.65]_线程PLC_read尝试连接 PLC__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:04:13,781]_[MainThread]_[main.py/main.91]_主程序已尝试启动全部线程，共计 1 个__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,036]_[MainThread]_[main.py/main.32]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,036]_[MainThread]_[main.py/main.42]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,055]_[MainThread]_[main.py/main.55]_Redis 连接成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,056]_[MainThread]_[main.py/main.64]_单一实例确认成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,105]_[MainThread]_[main.py/main.67]_Redis 数据清理成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,106]_[MainThread]_[main.py/main.85]_主程序尝试启动线程: start_PLC_read__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,107]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.36]_线程 PLC_read 正在启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,111]_[PLC_read]_[__init__.py/__init__.73]_creating snap7 client__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:50,111]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.65]_线程PLC_read尝试连接 PLC__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:06:51,113]_[MainThread]_[main.py/main.91]_主程序已尝试启动全部线程，共计 1 个__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,738]_[MainThread]_[main.py/main.32]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,738]_[MainThread]_[main.py/main.42]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,746]_[MainThread]_[main.py/main.55]_Redis 连接成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,746]_[MainThread]_[main.py/main.64]_单一实例确认成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,888]_[MainThread]_[main.py/main.67]_Redis 数据清理成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,889]_[MainThread]_[main.py/main.85]_主程序尝试启动线程: start_PLC_read__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,889]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.36]_线程 PLC_read 正在启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,894]_[PLC_read]_[__init__.py/__init__.73]_creating snap7 client__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:06,894]_[PLC_read]_[prc_PLC_read.py/prc_PLC_read.65]_线程PLC_read尝试连接 PLC__
+__[INFO]_[HND.BRS01]_[2025-02-11 11:07:07,896]_[MainThread]_[main.py/main.91]_主程序已尝试启动全部线程，共计 1 个__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:00:22,712]_[MainThread]_[main.py/main.32]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:00:22,736]_[MainThread]_[main.py/main.42]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:00:22,767]_[MainThread]_[main.py/main.55]_Redis 连接成功__
+__[ERROR]_[HND.BRS01]_[2025-02-11 16:00:22,767]_[MainThread]_[main.py/main.60]_已有程序运行中，本程序将退出！！！__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:10,988]_[MainThread]_[main.py/main.33]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:10,988]_[MainThread]_[main.py/main.43]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:10,998]_[MainThread]_[main.py/main.56]_Redis 连接成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:10,999]_[MainThread]_[main.py/main.65]_单一实例确认成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:11,052]_[MainThread]_[main.py/main.68]_Redis 数据清理成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:11,053]_[MainThread]_[main.py/main.86]_主程序尝试启动线程: start_PLC_write__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:11,053]_[PLC_write]_[prc_PLC_write.py/prc_PLC_write.37]_线程 PLC_write 正在启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:11,064]_[PLC_write]_[__init__.py/__init__.73]_creating snap7 client__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:11,065]_[PLC_write]_[prc_PLC_write.py/prc_PLC_write.67]_线程PLC_write尝试连接 PLC__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:11,066]_[PLC_write]_[prc_PLC_write.py/prc_PLC_write.74]_线程 PLC_write 注册stream组成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:11,186]_[PLC_write]_[__init__.py/__init__.87]_destroying snap7 client__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:03:12,066]_[MainThread]_[main.py/main.92]_主程序已尝试启动全部线程，共计 1 个__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:17,879]_[MainThread]_[main.py/main.33]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:17,879]_[MainThread]_[main.py/main.43]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:17,889]_[MainThread]_[main.py/main.56]_Redis 连接成功__
+__[ERROR]_[HND.BRS01]_[2025-02-11 16:09:17,889]_[MainThread]_[main.py/main.61]_已有程序运行中，本程序将退出！！！__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,078]_[MainThread]_[main.py/main.33]_main 线程启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,078]_[MainThread]_[main.py/main.43]_配置与日志初始化成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,087]_[MainThread]_[main.py/main.56]_Redis 连接成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,088]_[MainThread]_[main.py/main.65]_单一实例确认成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,131]_[MainThread]_[main.py/main.68]_Redis 数据清理成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,132]_[MainThread]_[main.py/main.86]_主程序尝试启动线程: start_PLC_write__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,132]_[PLC_write]_[prc_PLC_write.py/prc_PLC_write.37]_线程 PLC_write 正在启动__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,137]_[PLC_write]_[__init__.py/__init__.73]_creating snap7 client__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,137]_[PLC_write]_[prc_PLC_write.py/prc_PLC_write.67]_线程PLC_write尝试连接 PLC__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:31,138]_[PLC_write]_[prc_PLC_write.py/prc_PLC_write.74]_线程 PLC_write 注册stream组成功__
+__[INFO]_[HND.BRS01]_[2025-02-11 16:09:32,147]_[MainThread]_[main.py/main.92]_主程序已尝试启动全部线程，共计 1 个__
