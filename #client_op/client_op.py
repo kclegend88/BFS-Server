@@ -115,6 +115,11 @@ class MainWindow(QMainWindow):
         self.read_btn.clicked.connect(self.read_data)
         right_layout.addWidget(self.read_btn)
 
+        self.save_btn = QPushButton("保存数据")
+        self.save_btn.setEnabled(True)
+        self.save_btn.clicked.connect(self.save_data)
+        right_layout.addWidget(self.save_btn)
+
         content_layout.addLayout(right_layout, 60)
         main_layout.addLayout(content_layout)
 
@@ -397,6 +402,7 @@ class MainWindow(QMainWindow):
         self.inst_redis.clearset("set_reading_gr")
         self.inst_redis.clearset("set_check_ng_catch")
         self.inst_redis.clearset("set_hawb_rj")
+        self.inst_redis.clearset("set_reading_gr")
 
         mb_info = next((mb for mb in self.mb_data if mb['MBID'] == self.current_mbid), None)
         if not mb_info:
@@ -414,6 +420,74 @@ class MainWindow(QMainWindow):
         self.inst_redis.setkey("sys:batchid",self.current_mbid)
 
         QMessageBox.information(self, "成功", "数据已发送")
+
+    def save_data(self):
+        if not self.current_mbid or self.source_combo.currentIndex() != 1:
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            "确认更新",
+            "确定要将当前分单状态更新到数据库吗？此操作不可逆！",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if confirm != QMessageBox.Yes:
+            return
+
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            hb_list = self.hb_data.get(self.current_mbid, [])
+            if not hb_list:
+                QMessageBox.information(self, "提示", "没有可更新的分单数据")
+                return
+
+            # 准备批量更新数据
+            update_data = [(hb['HBStatus'], hb['HBID']) for hb in hb_list]
+
+            # 执行事务更新
+            cursor.executemany(
+                "UPDATE HB_Info SET HBStatus = ? WHERE HBID = ?",
+                update_data
+            )
+            conn.commit()
+
+            # 刷新本地缓存
+            self.fetch_hb_data_local(self.current_mbid)
+
+            # 更新界面显示
+            self.update_stats(self.current_mbid)
+            self.update_hb_detail_table()
+
+            QMessageBox.information(self, "成功", "已成功更新 {} 条分单状态".format(len(hb_list)))
+
+        except sqlite3.Error as e:
+            QMessageBox.critical(self, "数据库错误", f"更新失败:\n{str(e)}")
+            if conn:
+                conn.rollback()
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"发生未知错误:\n{str(e)}")
+        finally:
+            if conn:
+                conn.close()
+
+    def fetch_hb_data_local(self, mbid):
+        """从本地数据库重新加载指定主单的分单数据"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT HBID, HBStatus, HBCustom FROM HB_Info WHERE MBID=?", (mbid,))
+            self.hb_data[mbid] = [{
+                "HBID": row[0],
+                "HBStatus": row[1],
+                "HBCustom": row[2],
+                "MBID": mbid
+            } for row in cursor.fetchall()]
+            conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "数据库错误", f"刷新数据失败:\n{str(e)}")
     def load_settings(self):
         settings = QSettings("MyCompany", "MyApp")
         self.db_path = settings.value("db_path", "")

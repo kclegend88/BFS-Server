@@ -257,6 +257,11 @@ Update barcodecheck, when status = 500, if rescan, accumelate status to 501,502.
 
 Update fRedis keys, return empty list, not none to avoid unneccessary TypeError Fault
 
+
+# Rev 0.6.2
+Update cli_qt, add list for mr,nr,NG
+Update cli_ms, add command __clean__ 
+Update client op, add save date function, save status into db
  
 
  
