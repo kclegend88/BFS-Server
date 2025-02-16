@@ -5,7 +5,6 @@ import time
 import datetime
 import pygame
 from fBarcode import barcode_existingcheck
-from fVerificationDialog import VerificationDialog
 from PyQt5.QtWidgets import QDialog
 from fBarcode import barcode_formatcheck
 from fLog import clsLogger
@@ -112,16 +111,7 @@ def start_process(config_file,__cli_id__):
         set_reading_mr = inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
         sys_status = inst_redis.getkey("sys:status")    #更新系统状态
         set_check_ng = inst_redis.getset("set_check_ng")    # 更新set_check_ng
-        if strManualScanBarcode == "__clean__":  # 特定的清场命令
-            inst_logger.info("收到__clean__命令，向服务器发送离开清场模式的指令")
-            inst_redis.setkey(f"manualscan:cli{__cli_id__:02}_qt:input", "")  # 清空缓冲区
-            inst_redis.xadd("stream_manualscan",
-                            {'cli_id': __cli_id__, 'scan_id': __prc_id__, 'barcode': strManualScanBarcode,
-                             'type': '**'})  # 插入 Manual Scan stream/MR
-            mixer.music.load(dict_sound['ms_barcode_rescan_accept'])
-            mixer.music.play()
-            continue
-        if len(lst_reading_nr) + len(set_reading_mr) + len(set_check_ng)== 0:  # 正常状态，不需要补码
+        if len(lst_reading_nr) + len(set_reading_mr) + len(set_check_ng) == 0:  # 正常状态，不需要补码
         # if len(lst_reading_nr) + len(set_reading_mr) == 0:  # 正常状态，不需要补码
             continue
 
@@ -151,9 +141,6 @@ def start_process(config_file,__cli_id__):
             # lst_reading_nr = inst_redis.getset("set_reading_nr")
             # 更新set_reading_mr
             lst_reading_mr = inst_redis.getset("set_reading_mr")         
-
-            # 如果条码开头为"##" 说明该条码为手动输入框输入条码或特殊条码
-
 
             # 如果条码开头为"##" 说明该条码为手动输入框输入条码或特殊条码
             if strManualScanBarcode.startswith("*"):       # 条码破损或其他原因导致的手动输入条码
@@ -211,19 +198,19 @@ def start_process(config_file,__cli_id__):
                 mixer.music.load(dict_sound['ms_barcode_rescan_accept'])
                 mixer.music.play()
                 # 创建并使用对话框
-                dialog = VerificationDialog()
-                result = dialog.exec_()
-
-                if result == QDialog.Accepted:
-                    # 成功捕获NG包裹，且扫描了正确的框号
-                    inst_redis.sadd("set_check_ng_catch", strManualScanBarcode)  # set_check_ng_catch
-                    inst_logger.info(
-                        "NG包裹捕获成功,线程 %s 将NG包裹 %s 加入set_check_ng_catch中" % (__prc_name__, strManualScanBarcode))
-                    continue
-                else:
-                    inst_logger.info(
-                        "NG包裹扫描成功，捕获失败,线程 %s 未能将NG包裹 %s 加入set_check_ng_catch中" % (__prc_name__, strManualScanBarcode))
-                    continue
+                # dialog = VerificationDialog()
+                # result = dialog.exec_()
+                #
+                # if result == QDialog.Accepted:
+                #     # 成功捕获NG包裹，且扫描了正确的框号
+                #     inst_redis.sadd("set_check_ng_catch", strManualScanBarcode)  # set_check_ng_catch
+                #     inst_logger.info(
+                #         "NG包裹捕获成功,线程 %s 将NG包裹 %s 加入set_check_ng_catch中" % (__prc_name__, strManualScanBarcode))
+                #     continue
+                # else:
+                #     inst_logger.info(
+                #         "NG包裹扫描成功，捕获失败,线程 %s 未能将NG包裹 %s 加入set_check_ng_catch中" % (__prc_name__, strManualScanBarcode))
+                #     continue
 
             # 条码格式校验
             bBarcodeValid = False

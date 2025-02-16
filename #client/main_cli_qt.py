@@ -1,4 +1,5 @@
 # prc_template  v 0.2.0
+import shutil
 import sys
 from symbol import pass_stmt
 from time import sleep
@@ -19,7 +20,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import Qt, QSize, QThread
 from PyQt5.QtGui import QPixmap, QColor, QPainter, QFont, QPalette, QBrush, QTransform
 from PyQt5.QtWidgets import QWidget, QGridLayout, QApplication, QFrame, QLabel, QVBoxLayout, QSplitter, QHBoxLayout, \
-    QTableWidgetItem, QLineEdit, QPushButton, QMessageBox,QStatusBar,QListWidget,QListWidgetItem
+    QTableWidgetItem, QLineEdit, QPushButton, QMessageBox, QStatusBar, QListWidget, QListWidgetItem
 
 from fBarcode import barcode_formatcheck
 from fLog import clsLogger
@@ -27,7 +28,7 @@ from fConfig import clsConfig
 from fConfigEx import clsConfigEx
 from fRedis import clsRedis
 from pygame import mixer
-
+from fVerificationDialog import VerificationDialog
 
 class BarcodeDisplay(QWidget):
     def __init__(self, inst_redis, __cli_id__, inst_logger, __prc_name__, __ini_prc_config__):
@@ -68,14 +69,14 @@ class BarcodeDisplay(QWidget):
         self.exception_handling = 0
         try:
             inst_redis.xcreategroup(self.stream_name_create, self.__prc_name__)
-            inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__,self.stream_name_create))
+            inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__, self.stream_name_create))
         except Exception as e:
-            inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__,self.stream_name_create))
+            inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__, self.stream_name_create))
         try:
             inst_redis.xcreategroup(self.stream_name_delete, self.__prc_name__)
-            inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__,self.stream_name_delete))
+            inst_logger.info("线程 %s 注册stream组 %s 成功" % (self.__prc_name__, self.stream_name_delete))
         except Exception as e:
-            inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__,self.stream_name_delete))
+            inst_logger.info("线程 %s 注册stream组 %s 失败，该组已存在" % (self.__prc_name__, self.stream_name_delete))
         self.init_ui()
 
         # 清场模式下 扫描条码的集合已扫描数据集合
@@ -159,7 +160,7 @@ class BarcodeDisplay(QWidget):
         font1.setPointSize(15)
 
         # 设置字体大小 用于状态条
-        status_front = QtGui.QFont("Arial",16)
+        status_front = QtGui.QFont("Arial", 16)
 
         self.setWindowTitle("Manual Scan Client(补码客户端)")
         self.setGeometry(100, 100, 300, 200)
@@ -171,22 +172,22 @@ class BarcodeDisplay(QWidget):
         # self.statusbar.addPermanentWidget(self.caps_lock_label)
         # self.pagelabel = QLabel("Current Page : 1")
         # self.statusbar.addWidget(self.pagelabel)
-        self.statusbar.showMessage("Client Start",4000)
+        self.statusbar.showMessage("Client Start", 4000)
 
         # 创建流量状态条 显示系统短时流量和长时间流量
         self.tpbar = QStatusBar()
         self.tpbar.setFont(status_front)
 
-        self.MAWB = QLabel("MAWB:", self)   # 标题 MAWB
+        self.MAWB = QLabel("MAWB:", self)  # 标题 MAWB
         self.MAWB.setFont(font)
-        self.mawbid = QLabel("xx", self)    # 显示主单编号 mawbid，取自redis中sys:batchid
+        self.mawbid = QLabel("xx", self)  # 显示主单编号 mawbid，取自redis中sys:batchid
         self.mawbid.setFont(font1)
-        self.STATUS = QLabel("Status:", self)   # 标题 Status
+        self.STATUS = QLabel("Status:", self)  # 标题 Status
         self.STATUS.setFont(font)
-        self.sysstatus = QLabel("status", self) 
+        self.sysstatus = QLabel("status", self)
         # 显示当前系统状态idle/normal/alert/stop/resume
         self.sysstatus.setFont(font1)
-        self.HAWB = QLabel("HAWB:", self)   # 标题 HAWB
+        self.HAWB = QLabel("HAWB:", self)  # 标题 HAWB
         self.HAWB.setFont(font)
 
         # 创建MAWB布局，HAWB布局
@@ -268,14 +269,14 @@ class BarcodeDisplay(QWidget):
         leftlayout.addWidget(line)
         leftlayout.addLayout(self.HAWBLayout, 2)
         leftlayout.addLayout(self.HAWBinfo, 2)
-        #leftlayout.addWidget(line1)
+        # leftlayout.addWidget(line1)
         leftlayout.addLayout(self.showdatagridlayout, 2)
-        leftlayout.addLayout(list_layout,4)
-        #leftlayout.addWidget(self.input, 1)
-        #leftlayout.addWidget(self.btn_submit, 1)
+        leftlayout.addLayout(list_layout, 4)
+        # leftlayout.addWidget(self.input, 1)
+        # leftlayout.addWidget(self.btn_submit, 1)
         leftlayout.addLayout(self.pidaiji_layout, 4)
-        leftlayout.addWidget(self.statusbar,1)
-        leftlayout.addWidget(self.tpbar,1)
+        leftlayout.addWidget(self.statusbar, 1)
+        leftlayout.addWidget(self.tpbar, 1)
         leftlayout.setContentsMargins(0, 0, 0, 0)
 
         # 创建右侧布局 table控件
@@ -319,35 +320,48 @@ class BarcodeDisplay(QWidget):
         扫码枪通常会将条码数据当作普通键盘输入，按下回车键表示输入结束。
         """
         key = event.key()
-        if key != Qt.Key_Return and key != Qt.Key_Enter:    # 不是回车键
-            self.barcode_input += event.text()              # 添加按下的字符到条码输入缓存，返回
+        if key != Qt.Key_Return and key != Qt.Key_Enter:  # 不是回车键
+            self.barcode_input += event.text()  # 添加按下的字符到条码输入缓存，返回
             return
         if self.barcode_input == "":
             return
-        str_bc_input = str(self.barcode_input)              # 获取str格式的输入信息
-        self.barcode_input = ""                             # 清空按键输入缓存
+        str_bc_input = str(self.barcode_input)  # 获取str格式的输入信息
+        self.barcode_input = ""  # 清空按键输入缓存
         self.inst_logger.info(f"QT收到的完整输入信息:{str_bc_input}")
-
+        #######
+        set_check_ng = self.inst_redis.getset("set_check_ng")
+        if str_bc_input in set_check_ng:
+            dialog = VerificationDialog()
+            result = dialog.exec_()
+            if result == 1:
+            # 成功捕获NG包裹，且扫描了正确的框号
+                self.inst_redis.sadd("set_check_ng_catch", str_bc_input)  # set_check_ng_catch
+                self.inst_logger.info(
+                    "NG包裹捕获成功,线程 %s 将NG包裹 %s 加入set_check_ng_catch中" % (self.__prc_name__, str_bc_input))
+            else:
+                self.inst_logger.info(
+                    "NG包裹扫描成功，捕获失败,线程 %s 未能将NG包裹 %s 加入set_check_ng_catch中" % (self.__prc_name__, str_bc_input))
+        ########
         # 判断收到的是条码还是命令，如果不是以*开头，*结尾的，不是命令
         str_command_input = ""
         if str_bc_input.startswith("*") and str_bc_input.endswith("*"):
             str_command_input = str_bc_input[1:-1]
             self.inst_logger.info(f"收到命令: {str_command_input}")
-        if str_command_input == "enterclean":   # 进入清场模式
+        if str_command_input == "enterclean":  # 进入清场模式
             self.inst_logger.info(f"收到进入清场模式的指令，尝试进入清场模式")
-            if self.exception_handling == 1:    # 已经是清场模式
+            if self.exception_handling == 1:  # 已经是清场模式
                 self.inst_logger.info(f"进入清场模式失败，当前已经在清场模式中")
                 return
             str_sys_status = self.inst_redis.getkey("sys:status")
-            if str_sys_status not in ["stop","clean"]:    # 只允许在系统停止的情况下，进入清场模式
+            if str_sys_status not in ["stop", "clean"]:  # 只允许在系统停止的情况下，进入清场模式
                 self.inst_logger.info(f"进入清场模式失败，当前系统在正常运行中")
                 return
             # 判断 mr nr ng 三个列表，如果三个列表全部为空，不允许进入清场模式
             set_reading_nr = self.inst_redis.getset("set_reading_nr")  # 更新set_reading_nr
             set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
             set_reading_gr = self.inst_redis.getset("set_reading_gr")
-            set_check_ng =self.inst_redis.getset("set_check_ng")
-            if len(set_reading_nr)+ len(set_reading_mr)+len(set_check_ng) == 0:
+            set_check_ng = self.inst_redis.getset("set_check_ng")
+            if len(set_reading_nr) + len(set_reading_mr) + len(set_check_ng) == 0:
                 self.inst_logger.info(f"进入清场模式失败，NR,MR,NG列表全为空")
                 return
 
@@ -365,58 +379,56 @@ class BarcodeDisplay(QWidget):
             self.scanned_all.clear()
 
             self.exception_handling = 1
-            self.inst_redis.setkey("sys:status","clean")
+            self.inst_redis.setkey("sys:status", "clean")
             self.inst_logger.info(f"系统进入清场模式")
             self.show_status("⚠ 系统进入清场模式！", "#FFA500")
             return
 
-        if str_command_input == "endclean":     # 离开清场模式
+        if str_command_input == "endclean":  # 离开清场模式
             self.inst_logger.info(f"收到离开清场模式的指令，尝试离开清场模式")
-            if self.exception_handling == 0:    # 当前不是清场模式
+            if self.exception_handling == 0:  # 当前不是清场模式
                 self.inst_logger.info(f"离开清场模式失败，当前不在清场模式中")
                 return
             # 如果mr数量不匹配
-            for i,code in enumerate(self.scanned_ng):
-                self.inst_redis.sadd("set_check_ng_catch",code)  # 直接更新redis中catch的集合
+            for i, code in enumerate(self.scanned_ng):
+                self.inst_redis.sadd("set_check_ng_catch", code)  # 直接更新redis中catch的集合
                 self.inst_logger.info(f"向 set_check_ng_catch 中添加 {code}")
                 self.show_status(f"✅ Clean 模式下确认 已剔除 NG包裹 条码: {code}", "#90EE90")
                 time.sleep(2)
 
-            for i,code in enumerate(self.scanned_nr):
-                self.update_barcode(code)   # update redis，传递补码信息给ms线程
+            for i, code in enumerate(self.scanned_nr):
+                self.update_barcode(code)  # update redis，传递补码信息给ms线程
                 self.inst_logger.info(f"向 ms线程发送 NR 条码 {code}")
                 self.show_status(f"✅ Clean 模式下确认 MR 条码: {code}", "#90EE90")
                 time.sleep(2)
 
-            for i,code in enumerate(self.scanned_mr):
+            for i, code in enumerate(self.scanned_mr):
                 self.update_barcode(code)  # update redis，传递补码信息给ms线程
                 self.inst_logger.info(f"向 ms线程发送 MR 条码 {code}")
                 self.show_status(f"✅ Clean 模式下确认 NR 条码: {code}", "#90EE90")
                 time.sleep(2)
 
-
-
             # 尚未匹配的MR、NR，予以删除
             # clearsetvalue
 
             # 所有set都已经变化过了，重新刷新
-            set_reading_nr = self.inst_redis.getset("set_reading_nr")   # 更新set_reading_nr
-            set_ms_nr = self.inst_redis.getset("set_ms_nr")         # 更新set_ms_nr
-            for i,uid in enumerate(set_reading_nr):                 # 多出来的nr 一律剔除
-                if i>=len(set_ms_nr):
-                    self.inst_redis.clearsetvalue("set_reading_nr",uid)
+            set_reading_nr = self.inst_redis.getset("set_reading_nr")  # 更新set_reading_nr
+            set_ms_nr = self.inst_redis.getset("set_ms_nr")  # 更新set_ms_nr
+            for i, uid in enumerate(set_reading_nr):  # 多出来的nr 一律剔除
+                if i >= len(set_ms_nr):
+                    self.inst_redis.clearsetvalue("set_reading_nr", uid)
                     self.inst_logger.info(f"删除异常MR条码  {uid}")
 
-            set_reading_mr = self.inst_redis.getset("set_reading_mr")   # 更新set_reading_mr
-            set_ms_mr = self.inst_redis.getset("set_ms_mr")         # 更新set_ms_mr
-            for i, code in enumerate(set_reading_mr):               # 多出来的mr 一律剔除
+            set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
+            set_ms_mr = self.inst_redis.getset("set_ms_mr")  # 更新set_ms_mr
+            for i, code in enumerate(set_reading_mr):  # 多出来的mr 一律剔除
                 if code not in set_ms_mr:
                     self.inst_redis.clearsetvalue("set_reading_mr", code)
                     self.inst_logger.info(f"删除异常MR条码  {code}")
 
-            set_check_ng = self.inst_redis.getset("set_check_ng")   # 更新set_check_ng
-            for i, code in enumerate(set_check_ng):                 # 所有NG确认已经catch
-                self.inst_redis.sadd("set_check_ng_catch",code)
+            set_check_ng = self.inst_redis.getset("set_check_ng")  # 更新set_check_ng
+            for i, code in enumerate(set_check_ng):  # 所有NG确认已经catch
+                self.inst_redis.sadd("set_check_ng_catch", code)
                 self.inst_logger.info(f"添加捕获NG条码  {code}")
             # self.inst_redis.clearset("set_reading_nr")
             # self.inst_redis.clearset("set_reading_mr")
@@ -427,7 +439,7 @@ class BarcodeDisplay(QWidget):
             self.inst_logger.info(f"send __clean__ command")
 
             time.sleep(2)
-            
+
             # 状态值更改
             self.exception_handling = 0
             # self.inst_redis.setkey("sys:status", "resume") # plc 复位输送机，重启
@@ -437,11 +449,11 @@ class BarcodeDisplay(QWidget):
             self.exception_list.clear()
             return
 
-        if not str_command_input:       # 收到的是条码
-            if self.exception_handling != 1 :       # 正常补码模式，条码发送给ms线程即可
-                self.update_barcode(str_bc_input)   # update redis，传递补码信息给ms线程
-                self.scanbarcode = str_bc_input     # 传递条码信息给定时更新程序 update_table
-                self.show_status(f"✅ 收到条码，{str_bc_input}", "#90EE90")
+        if not str_command_input:  # 收到的是条码
+            if self.exception_handling != 1:  # 正常补码模式，条码发送给ms线程即可
+                self.update_barcode(str_bc_input)  # update redis，传递补码信息给ms线程
+                self.scanbarcode = str_bc_input  # 传递条码信息给定时更新程序 update_table
+                self.show_status(f"✅ 收到条码：{str_bc_input}", "#90EE90")
             else:
                 # clean 模式，表格更新、状态显示、声音播放都需要自己处理
                 try:
@@ -451,7 +463,7 @@ class BarcodeDisplay(QWidget):
                         if barcode_formatcheck(str_bc_input, re_exp):  # 如果手动输入的条码通过正则校验,填加至序列等待处理
                             bBarcodeValid = True
                             break
-                    if not bBarcodeValid:                       # 不合格条码, 播放声音后退出
+                    if not bBarcodeValid:  # 不合格条码, 播放声音后退出
                         self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}不符合格式规范!! ")
                         self.show_status(f"clean 模式：条码 {str_bc_input} 不符合格式规范!!", "#FFB6C1")
                         mixer.music.load(self.dict_sound['ms_barcode_reject'])
@@ -459,20 +471,20 @@ class BarcodeDisplay(QWidget):
                         return
 
                     set_reading_confirm = self.inst_redis.getset("set_reading_confirm")  # 更新set_reading_confirm
-                    if str_bc_input in set_reading_confirm:                     # 已确认发出的条码 播放拒绝声音后退出
+                    if str_bc_input in set_reading_confirm:  # 已确认发出的条码 播放拒绝声音后退出
                         self.inst_logger.info("条码已存在于confirm清单中")
                         self.show_status(f"clean 模式：条码 {str_bc_input} 已回传系统！!", "#FFB6C1")
                         mixer.music.load(self.dict_sound['ms_barcode_exist'])
                         mixer.music.play()
                         return
-                    self.exception_list.append(self.barcode_input)              # 排除上述条码，以下场景均为补码
+                    self.exception_list.append(self.barcode_input)  # 排除上述条码，以下场景均为补码
 
-                    set_reading_gr = self.inst_redis.getset("set_reading_gr")   # CV03上正常读取的条码
-                    if str_bc_input in set_reading_gr:                          # 扫描正常的包裹
+                    set_reading_gr = self.inst_redis.getset("set_reading_gr")  # CV03上正常读取的条码
+                    if str_bc_input in set_reading_gr:  # 扫描正常的包裹
                         self.scanned_all.add(str_bc_input)
                         self.scanned_gr.add(str_bc_input)
                         self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}在正确读取清单reading_gr中")
-                        self.show_status(f"clean 模式：条码 {str_bc_input} 为正确读取条码", "#90EE90") # 绿色
+                        self.show_status(f"clean 模式：条码 {str_bc_input} 为正确读取条码", "#90EE90")  # 绿色
                         self.exception_list.append(str_bc_input)
                         return
 
@@ -482,16 +494,16 @@ class BarcodeDisplay(QWidget):
                         mixer.music.load(self.dict_sound['ms_barcode_rescan_accept'])
                         mixer.music.play()
                         self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}在多条码清单reading_mr中")
-                        self.show_status(f"clean 模式：条码 {str_bc_input} 为MR条码", "#87CEEB")    # 蓝色
+                        self.show_status(f"clean 模式：条码 {str_bc_input} 为MR条码", "#87CEEB")  # 蓝色
                         return
 
-                    set_check_ng = self.inst_redis.getset("set_check_ng")   # CV03上的NG条码
+                    set_check_ng = self.inst_redis.getset("set_check_ng")  # CV03上的NG条码
                     if str_bc_input in set_check_ng:
                         self.scanned_ng.add(str_bc_input)
                         mixer.music.load(self.dict_sound['ms_barcode_rescan_accept'])
                         mixer.music.play()
                         self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}在NG清单check_ng中")
-                        self.show_status(f"clean 模式：条码 {str_bc_input} 为NG条码,请剔除！！", "#FFB6C1")    # 红色
+                        self.show_status(f"clean 模式：条码 {str_bc_input} 为NG条码,请剔除！！", "#FFB6C1")  # 红色
                         return
 
                     # 收到一个合格条码，但不在以上清单中，视为NR补码
@@ -499,7 +511,7 @@ class BarcodeDisplay(QWidget):
                     mixer.music.load(self.dict_sound['ms_barcode_rescan_accept'])
                     mixer.music.play()
                     self.inst_logger.info(f"clean 模式下收到的条码{str_bc_input}不在任何清单中,视为NR补码成功")
-                    self.show_status(f"clean 模式：条码 {str_bc_input} 为NoRead条码", "#87CEEB")    # 蓝色
+                    self.show_status(f"clean 模式：条码 {str_bc_input} 为NoRead条码", "#87CEEB")  # 蓝色
                 except Exception as e:
                     print(f"Error in keyPressEvent: {e}")
                     print(traceback.format_exc())
@@ -510,10 +522,10 @@ class BarcodeDisplay(QWidget):
         self.tableWidget = QtWidgets.QTableWidget()
         self.tableWidget.setFont(font)
         self.tableWidget.setAutoScrollMargin(16)
-        self.tableWidget.setRowCount(10)
+        self.tableWidget.setRowCount(20)
         self.tableWidget.setObjectName("tableWidget")
         self.tableWidget.setColumnCount(5)
-        self.tableWidget.setHorizontalHeaderLabels(["条码", "X值", "Y值", "scan","check"])
+        self.tableWidget.setHorizontalHeaderLabels(["条码", "X值", "Y值", "scan", "check"])
         self.tableWidget.horizontalHeader().setDefaultSectionSize(258)
         self.tableWidget.setColumnWidth(0, 220)
         self.tableWidget.setColumnWidth(1, 90)
@@ -610,7 +622,7 @@ class BarcodeDisplay(QWidget):
             #    time.sleep(1)
             #    if self.inst_redis.getkey("plc_conv:status") == 'pause':
             #        self.exception_handling = 1
-                    # 创建一个消息框
+            # 创建一个消息框
             #        msg_box = QMessageBox()
             #        msg_box.setIcon(QMessageBox.Critical)
             #        msg_box.setText("请逐个扫描包裹条码")
@@ -801,8 +813,8 @@ class BarcodeDisplay(QWidget):
                                 if not self.all_show_flag:  # 如果皮带机不处于正常，就不显示GR
                                     continue
                                 plc_status = self.inst_redis.getkey('plc_conv:fullspeed')
-                                if plc_status != 'yes':
-                                    continue
+                                # if plc_status != 'yes':
+                                #     continue
                                 path = self.AITarget_file_path
                                 ftp_path = self.ftp_path_Alread
                             elif result == 'NR':
@@ -822,7 +834,7 @@ class BarcodeDisplay(QWidget):
                             # 先构建 图片路径 获取当前日期
                             now = datetime.datetime.now()
                             day = now.strftime("%Y-%m-%d")
-
+                            day = "2025-02-05"
                             path = path + '\\' + day + '\\'
                             ftp_path = ftp_path + '/' + day + '/'
                             print(path)
@@ -873,42 +885,41 @@ class BarcodeDisplay(QWidget):
                 self.inst_logger.error(f"{traceback.format_exc()}")
 
     def ftp_download(self, path, uid, ftp_path):
-        count = 0
+        local_path = "D:/TEST/Image" + ftp_path
+        self.inst_logger.info(f"{local_path}")
         for i in range(5):
             time.sleep(0.5)
-            # 连接到FTP服务器
-            ip = self.server_ip
-            ftp = FTP(ip)  # 服务器地址
-            ftp.login('ftp', '')  # 使用正确的用户名和密码
-            self.inst_logger.info(f"ftp_path{ftp_path}")
-            # 图片文件的路径，切换到正确的目录
-            ftp.cwd(f'{ftp_path}')  # 实际路径
-            # 列出目录中的所有文件，找到匹配的文件
-            file_list = ftp.nlst()  # 获取当前目录下的所有文件名
-            # self.inst_logger.info(f"当前图片文件列表为{file_list}")
-            # 根据uid查找相关文件
+            # 获取本地目录中的所有文件
+            try:
+                file_list = os.listdir(local_path)  # 获取指定目录下的所有文件名
+            except FileNotFoundError:
+                self.inst_logger.info(f"目录 {local_path} 不存在")
+                break
             find_pic = None
 
             for filename in file_list:
                 if str(uid) in filename:  # 假设文件名中包含uid
                     find_pic = filename
                     break
-            # 下载图片
+                    # 找到文件后下载到本地路径
             if find_pic is None:
                 self.inst_logger.info(f"第{i}次未找到图片 {find_pic}")
-                ftp.quit()
                 continue
             else:
                 self.inst_logger.info(f"开始下载图片 {find_pic}")
-                local_path = f'{path}{find_pic}'  # 本地保存路径
+                local_save_path = os.path.join(path, find_pic)  # 本地保存路径
                 # 检查路径是否存在 不存在则创建路径
                 if not os.path.exists(path):
                     os.makedirs(path)
-                self.inst_logger.info(f"图片下载地址 {local_path}")
-                with open(local_path, 'wb') as f:
-                    ftp.retrbinary(f'RETR {find_pic}', f.write)  # 替换为实际的图片文件名
-                # 关闭FTP连接
-                ftp.quit()
+                self.inst_logger.info(f"图片保存地址 {local_save_path}")
+
+                # 直接将文件从本地复制到目标路径
+                source_path = os.path.join(local_path, find_pic)  # 源文件路径
+                if os.path.exists(source_path):
+                    shutil.copy(source_path, local_save_path)
+                    self.inst_logger.info(f"图片已成功保存到 {local_save_path}")
+                else:
+                    self.inst_logger.info(f"未找到文件 {find_pic} 在路径 {local_path}")
                 break
 
     def barcode_formatcheck(self, str_barcode, re_exp):
@@ -969,12 +980,12 @@ class BarcodeDisplay(QWidget):
     def control_update(self):
         set_reading_nr = self.inst_redis.getset("set_reading_nr")  # 更新set_reading_nr
         set_reading_mr = self.inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
-        set_check_ng = self.inst_redis.getset("set_check_ng") # 更新 set_check_ng
+        set_check_ng = self.inst_redis.getset("set_check_ng")  # 更新 set_check_ng
         str_sysstatus = self.inst_redis.getkey("sys:status")  # 更新sys status
         if self.exception_handling == 1:  # clean模式，使用QT内部的self.scanned_nr/mr 来匹配 list状态
             lst_nr = list(self.scanned_nr)
             set_mr = self.scanned_mr
-        else:                # 正常补码模式，使用主程序redis中的set_ms nr/mr 来匹配list状态
+        else:  # 正常补码模式，使用主程序redis中的set_ms nr/mr 来匹配list状态
             lst_nr = list(self.inst_redis.getset("set_ms_nr"))
             set_mr = self.inst_redis.getset("set_ms_mr")
 
@@ -986,26 +997,26 @@ class BarcodeDisplay(QWidget):
                 self.tpbar.showMessage(f"流量已更新，瞬时流量 {str_tp_short} 件/小时；平均流量 {str_tp_long} 件/小时")
 
         # 更新运单数据
-        set_hawb = self.inst_redis.getset("set_hawb")           # 运单中分单数量
+        set_hawb = self.inst_redis.getset("set_hawb")  # 运单中分单数量
         self.total_number.setText(f"{len(set_hawb)}")
-        str_batchid = self.inst_redis.getkey("sys:batchid")     # 主单编号
+        str_batchid = self.inst_redis.getkey("sys:batchid")  # 主单编号
         self.mawbid.setText(str_batchid)
-        str_batchid_count = self.inst_redis.getkey("sys:hawb:count")    # 本地数据库中存储的 已有结果的运单数量
+        str_batchid_count = self.inst_redis.getkey("sys:hawb:count")  # 本地数据库中存储的 已有结果的运单数量
         self.hpk_number.setText(str_batchid_count)
         self.out_number.setText("0")
 
-        self.NR.setText(f"NR:{len(lst_nr)}/{len(set_reading_nr)}")        # 已成功补码的NR/总NG
-        self.MR.setText(f"MR:{len(set_mr)}/{len(set_reading_mr)}")        # 已成功补码的MR/总MR
-        self.NG.setText(f"NG:{len(self.scanned_ng)}/{len(set_check_ng)}")          # 已成功捕捉的NG/总NG
+        self.NR.setText(f"NR:{len(lst_nr)}/{len(set_reading_nr)}")  # 已成功补码的NR/总NG
+        self.MR.setText(f"MR:{len(set_mr)}/{len(set_reading_mr)}")  # 已成功补码的MR/总MR
+        self.NG.setText(f"NG:{len(self.scanned_ng)}/{len(set_check_ng)}")  # 已成功捕捉的NG/总NG
 
         # 更新系统状态
         self.sysstatus.setText(f"{str_sysstatus}")
 
         # 更新NR列表
         self.nr_list.clear()
-        for i,code in enumerate(set_reading_nr):
+        for i, code in enumerate(set_reading_nr):
             if i < len(lst_nr):
-                item = self.create_list_item(lst_nr[i],True)
+                item = self.create_list_item(lst_nr[i], True)
             else:
                 item = self.create_list_item("No Read", False)
             self.nr_list.addItem(item)
@@ -1013,13 +1024,15 @@ class BarcodeDisplay(QWidget):
         # 更新MR列表
         self.mr_list.clear()
         for code in set_reading_mr:
-            item = self.create_list_item(code, code in set_mr,checked_color=QColor("#90EE90"),unchecked_color=QColor("#FFB6C1"))
+            item = self.create_list_item(code, code in set_mr, checked_color=QColor("#90EE90"),
+                                         unchecked_color=QColor("#FFB6C1"))
             self.mr_list.addItem(item)
 
         # 更新NG列表
         self.ng_list.clear()
         for code in set_check_ng:
-            item = self.create_list_item(code, code in self.scanned_ng, checked_color=QColor("#90EE90"),unchecked_color=QColor("#FFB6C1"))
+            item = self.create_list_item(code, code in self.scanned_ng, checked_color=QColor("#90EE90"),
+                                         unchecked_color=QColor("#FFB6C1"))
             self.ng_list.addItem(item)
 
         # if len(lst_reading_nr) == 0:
@@ -1167,6 +1180,7 @@ class BarcodeDisplay(QWidget):
         self.HAWBinfo.addWidget(self.total_number, 1, 0)
         self.HAWBinfo.addWidget(self.hpk_number, 1, 1)
         self.HAWBinfo.addWidget(self.out_number, 1, 2)
+
     # 添加分割线
     #     line = QFrame()
     #     line.setFrameShape(QFrame.HLine)  # 设置为水平分割线
@@ -1175,9 +1189,10 @@ class BarcodeDisplay(QWidget):
 
     # 显示状态条
     def show_status(self, message, color):
-        self.statusbar.showMessage(message,4000)
+        self.statusbar.showMessage(message, 4000)
         self.statusbar.setStyleSheet(f"background: {color};")
         # QTimer.singleShot(2000, self.clear_status)
+
     # 创建list元素 打勾或画方框
     def create_list_item(self, text, checked=False,
                          checked_color=QColor("#e0e0e0"),
@@ -1191,6 +1206,7 @@ class BarcodeDisplay(QWidget):
         else:
             item.setForeground(QBrush(unchecked_color))
         return item
+
 
 def start_process(config_file, __cli_id__):
     __prc_cli_type__ = f"cli_qt"
