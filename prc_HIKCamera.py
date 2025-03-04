@@ -195,19 +195,19 @@ def start_process(config_file):
         if prc_run_lock is None:  
             # --------------------
             # 以下为定制区域，用于中止通讯监听线程
-            if not cli.bExit:
-                cli.shutdown()                              # 关闭Socket 
-                inst_logger.info("线程 %s 尝试关闭网络监听线程"%(__prc_name__,))
-                while (int_last_ct_ms < 10000) and not cli.bExit :# 等待监听线程退出，最多等待 10s
-                    current_ts=datetime.datetime.now()      # 计算等待时间
-                    td_last_ct = current_ts - prc_luts          
-                    int_last_ct_ms = int(td_last_ct.total_seconds()*1000) 
-                    time.sleep(1)
-                    if cli.lstException:                    # 显示监听线程的退出信息、异常信息等
-                        for i, e in enumerate(cli.lstException):
-                            inst_logger.error("线程 %s 关闭时获取到异常信息，调用模块 %s，调用时间 %s，异常信息 %s "%(__prc_name__,e['module'],e['timestamp'],e['msg']))
-                        cli.lstException.clear()
-                # ToDo 强制终止监听线程
+            # if not cli.bExit:
+            #     cli.shutdown()                              # 关闭Socket
+            #     inst_logger.info("线程 %s 尝试关闭网络监听线程"%(__prc_name__,))
+            #     while (int_last_ct_ms < 10000) and not cli.bExit :# 等待监听线程退出，最多等待 10s
+            #         current_ts=datetime.datetime.now()      # 计算等待时间
+            #         td_last_ct = current_ts - prc_tp_luts
+            #         int_last_ct_ms = int(td_last_ct.total_seconds()*1000)
+            #         time.sleep(1)
+            #         if cli.lstException:                    # 显示监听线程的退出信息、异常信息等
+            #             for i, e in enumerate(cli.lstException):
+            #                 inst_logger.error("线程 %s 关闭时获取到异常信息，调用模块 %s，调用时间 %s，异常信息 %s "%(__prc_name__,e['module'],e['timestamp'],e['msg']))
+            #             cli.lstException.clear()
+            #     # ToDo 强制终止监听线程
             # 以上为定制区域，用于中止通讯监听线程           
             # --------------------
             int_exit_code = 1
@@ -216,6 +216,20 @@ def start_process(config_file):
         #如command区收到退出命令，根据线程类型决定是否立即退出
         prc_run_lock=inst_redis.getkey(f"pro_mon:{__prc_name__}:command")
         if prc_run_lock == "exit":
+            if not cli.bExit:
+                cli.shutdown()                              # 关闭Socket
+                inst_logger.info("线程 %s 尝试关闭网络监听线程"%(__prc_name__,))
+                int_last_ct_ms =0
+                while (int_last_ct_ms < 5000) and not cli.bExit :# 等待监听线程退出，最多等待 5s
+                    current_ts=datetime.datetime.now()      # 计算等待时间
+                    td_last_ct = current_ts - prc_tp_luts
+                    int_last_ct_ms = int(td_last_ct.total_seconds()*1000)
+                    time.sleep(1)
+                    if cli.lstException:                    # 显示监听线程的退出信息、异常信息等
+                        for i, e in enumerate(cli.lstException):
+                            inst_logger.error("线程 %s 关闭时获取到异常信息，调用模块 %s，调用时间 %s，异常信息 %s "%(__prc_name__,e['module'],e['timestamp'],e['msg']))
+                        cli.lstException.clear()
+            # ToDo 强制终止监听线程
             # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
             # 如有则暂缓退出，如没有立即退出
             int_exit_code = 2

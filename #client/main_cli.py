@@ -105,6 +105,10 @@ class main:
             strInput = input("Type 'Y' and press enter if you want to exit...: ")
             if strInput == 'Y':
                 break
+            time.sleep(1)
+            server_exit = inst_redis.getkey(f"sys_cli%02d:ready"%(__cli_id__,))
+            if not server_exit:     # 主线程退出的时候 需要删除所有client的ready 信号
+                break               # 主线程删除ready信号之后，client自动退出
 
         inst_redis.setkey(f"sys:cli%02d:command"%(__cli_id__,),"exit")
         # 将主程序堵塞至所有线程全部完成

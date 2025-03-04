@@ -189,6 +189,12 @@ def start_process(config_file):
             dict_reading_con['ts'] = datetime.datetime.now().isoformat()
             dict_reading_con['barcode'] = str_barcode
             dict_reading_con['scan_result'] = str_result
+			tempstr = inst_redis.getkey(f"parcel:check_result:{str_uid}")
+            if tempstr:
+				dict_reading_con['check_result'] = tempstr
+			else:
+				dict_reading_con['check_result'] = "ERROR"
+			# dict_reading_con['remark'] = inst_redis.getkey(f"parcel:remark:{str_uid}")                   
             # dict_reading_con['check_result'] = inst_redis.getkey(f"parcel:check_result:{str_uid}")
             # dict_reading_con['remark'] = inst_redis.getkey(f"parcel:remark:{str_uid}")                   
 
