@@ -13,7 +13,7 @@ import ast
 import time
 import re
 from logging import exception
-
+from fTraceEx import clsTraceEx
 
 class clsHIKCameraClient:
 
@@ -35,6 +35,8 @@ class clsHIKCameraClient:
         self.threadhandler = None       # 
         self.intValidFaultNo= 0         
         self.lstUnpackBuf = []
+        self.uid = 0
+        self.trace = clsTraceEx("recvbuf_trace.db")
 
     def append_exception(self, subfunc, msg):
         self.lstException.append(
@@ -72,17 +74,23 @@ class clsHIKCameraClient:
         while True:
             try:
                 self.bRECVThread = True
-                data = self.conn.recv(1024) # 堵塞至收到数据为止
+                data = self.conn.recv(2048) # 堵塞至收到数据为止
                 if not data:                    # 返回 空 表示对方已关闭连接
                     self.bDISCONNECT = True     # 设置断连标志
                     self.bRECVThread = False    # 标记监听线程已终止
                     self.append_exception("recv_thread", "连接已被对方关闭:%s"%(traceback.format_exc(),))
                     break                      # ToDo 后续可考虑通知主线程关闭的具体时间
                 # 收到不为空的数据
+                self.uid = self.uid + 1
+                self.trace.trace(self.uid,"fHIKCamera",data)
                 # ToDo  如果收到超长数据，需要存下来
                 #       上次缓存的校验失败数据，与本次读取的拼成一个包，再校验一次
                 self.lstUnpackBuf = self.unpack_buf(data)
+                if not self.lstUnpackBuf:
+                    # self.trace.trace(self.uid, "fHIKCamera_fault", data)
+                    self.append_exception("recv_thread", "缓冲区解包失败")
                 for i,data_item in enumerate(self.lstUnpackBuf):
+                    self.trace.trace(self.uid, "fHIKCamera_loop", data_item)
                     validdata = self.check_recvbuf(data_item)    # 数据校验
                     if validdata:    # 数据有效性校验通过
                         data_type = validdata['type']           # 确认消息类型，9000为心跳信号，1001为有效报文
@@ -90,16 +98,19 @@ class clsHIKCameraClient:
                             self.int_heart_counter = self.int_heart_counter + 1 
                         elif data_type == '1001':               # 收到正式报文（字符串1001尚不清楚）
                             self.int_msg_counter = self.int_msg_counter + 1
+                            self.trace.trace(self.int_msg_counter, "fHIKCamera_loop_1001", str(validdata))
                             self.convert_recvbuf(validdata)     # 数据处理函数，将缓冲区内的数据转换成期望的dict格式 
                             self.recv_buf.append(data)          # only for debug/接收缓冲区的原文
                             if len(self.lstValidData ) > 10:        # 有效数据缓冲区太满，说明主线程处理太慢
                                 self.append_exception("recv_thread", "有效数据缓冲区内数据过多，请及时处理！！")
+                        else:
+                            self.append_exception("recv_thread", "消息类型校验失败， 缓存区数据:%s"%(str(validdata)))
                     else:                                   # 未预料的数据包，或超长数据
                         self.append_exception("recv_thread", "接收缓冲区校验失败,错误代码%d, 缓存区数据:%s"
                                   %(self.intValidFaultNo,data.decode('utf-8')))
                         # ToDo缓存校验失败的数据，与下一次读取的拼成一个包，再校验一次
                 self.lstUnpackBuf.clear()
-                time.sleep(0.1)        
+                time.sleep(0.01)        
             except Exception as e:
                 self.bDISCONNECT = True
                 self.bRECVThread = False
@@ -119,10 +130,11 @@ class clsHIKCameraClient:
             if recv_data.endswith('}'):               # 完整后缀
                 if recv_data.find('}{') == -1:       # 不存在包黏连
                     lst_uppack_buf.append(recv_data)
-                    
+                    # recv_data, log_code 101 --> recv_buf_db
                 else:                               # 有包黏连
                     new_recv_data = recv_data.replace('}{','}^{')
                     lst_uppack_buf = new_recv_data.split('^')
+                    # lst_uppack_buf, log_code 102 --> recv_buf_db
                     self.append_exception("unpack_buf", "发现黏连的数据包，个数:%d"%(len(lst_uppack_buf),))
                 return lst_uppack_buf
             else:                                   # 后缀不完整，ToDo要将这段数据存起来，等着下一次读取的拼在一起
@@ -292,8 +304,7 @@ class clsHIKCameraClient:
             if len(unique_code) == 1 :  # 实际上不是多条码
                 dictValidData['code'] = code[0]
                 dictValidData['result'] = 'GR'
-                self.append_exception("convert_recvbuf", f"将一个条码的扫描结果由MR更改为GR!!!!")
-
+                self.append_exception("convert_recvbuf", f"将一个条码的扫描结果由MR更改为GR!!!! barcode = {dictValidData['code']},uid = {dict_recv_data['uid']}")
                 self.lstValidData.append(dictValidData.copy())
                 self.bRecvValidData = True
                 return

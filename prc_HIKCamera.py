@@ -10,7 +10,7 @@ from fConfig import clsConfig
 from fConfigEx import clsConfigEx
 from fRedis import clsRedis
 from fHIKCamera import clsHIKCameraClient
-
+from fTrace import clsTrace
 
 
 def start_process(config_file):
@@ -44,6 +44,14 @@ def start_process(config_file):
             # 如果包裹为OK，result设为 GR
             # 此处只做两个判断，a: 是否在主单中，不是则为OP; b: 是否为通缉，是则为RJ，不是则为OK
             # 对每一个GR和MR的进行检查
+            """
+            dictValidData['uid'] = dict_recv_data['uid']
+            dictValidData['req_ts'] = dict_recv_data['reqTime']
+            dictValidData['pos_x'] = position['x']
+            dictValidData['pos_y'] = position['y']
+            dictValidData['result'] = 'GR'/'MR'/'NR'
+            dictValidData['code'] =''/Barcode
+            """
             set_hawb = inst_redis.getset("set_hawb")
             set_hawb_rj = inst_redis.getset("set_hawb_rj")
             barcode=d['code']
@@ -51,12 +59,12 @@ def start_process(config_file):
                 d['result'] = 'NG_RJ'
             if barcode and not barcode_existingcheck(barcode,set_hawb): # 溢装件
                 d['result'] = 'NG_OP'
-
             inst_redis.xadd( "stream_test", d)      # 插入stream
+            inst_trace.trace(d['uid'],__prc_name__,f"{d['result']}:{d['code']}")
 
-            current_ts=datetime.datetime.now()      
+            current_ts=datetime.datetime.now()
             td_last_ct = current_ts - prc_tp_luts          
-            int_last_ct_ms = int(td_last_ct.total_seconds()*1000) 
+            int_last_ct_ms = int(td_last_ct.total_seconds()*1000)
             
             prc_tp_luts = current_ts
             prc_tp_counter = prc_tp_counter + 1
@@ -72,7 +80,7 @@ def start_process(config_file):
 
         # only for debug, add recv-data directly to stream_buf
         # ----------------
-        # inst_logger.debug("已收到报文 %s " %(cli.recv_buf,))
+        inst_logger.debug("已收到报文 %s " %(cli.recv_buf,))
         for i,r in enumerate(cli.recv_buf):               
             inst_redis.xadd( "stream_buf", {'buf':'read','data':r})
         # ----------------
@@ -92,7 +100,7 @@ def start_process(config_file):
         td_heart_ct = heart_current_ts - heart_luts
         int_heart_ct = int(td_heart_ct.total_seconds())
             
-        if int_heart_ct > 5:    # 每5秒发送一次心跳，ToDo 这个数字5今后要放到的ini里
+        if int_heart_ct > 10:    # 每10秒发送一次心跳，ToDo 这个数字5今后要放到的ini里
             heart_luts= datetime.datetime.now()
             try:
                 inst_redis.setkey(f"pro_mon:{__prc_name__}:receive_heart",cli.int_heart_counter)
@@ -111,10 +119,12 @@ def start_process(config_file):
                 inst_logger.error("线程 %s 尝试发送心跳时发生错误,发生未预料的错误： %s"%(__prc_name__,e))
     
     __prc_name__="HIKCamera"
+
     
     ini_config = clsConfig(config_file)     # 来自主线程的配置文件
     inst_logger = clsLogger(ini_config)     # 实际上与主线程使用的是同一实例
     inst_redis = clsRedis(ini_config)       # 实际上与主线程使用的是同一实例
+    inst_trace = clsTrace("Trace.db")
 
     inst_logger.info("线程 %s 正在启动" %(__prc_name__,))
 
@@ -171,6 +181,7 @@ def start_process(config_file):
             # 如果bRecvValidData为True，说明收到校验成功的数据
             if cli.bRecvValidData:
                 prc_HC_recvData()
+                heart_luts = datetime.datetime.now()
             # 检查是否有未记录的异常信息，如有的话，记录异常信息
             if cli.lstException:
                 for i, e in enumerate(cli.lstException):

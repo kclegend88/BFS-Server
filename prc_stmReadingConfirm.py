@@ -86,7 +86,7 @@ def start_process(config_file):
         # 主线程操作区
 
         # 获取当前操作模式
-        sys_opmode = inst_redis.getskey("sys:opmode")
+        sys_opmode = inst_redis.getkey("sys:opmode")
         if not sys_opmode == "OUT":
             sys_opmode = "HPK"
         l = inst_redis.xreadgroup("stream_reading_confirm","ReadingConfirm","ReadingConfirm-DB01")
@@ -105,6 +105,7 @@ def start_process(config_file):
                     if not hawb_check:
                         inst_logger.error("本单核查结果为空,单号 %s" %(dictdata['barcode'],))
                         hawb_check = "*OK*"
+                    # 如计数有误，需要将hawb_check强行赋值 sys_opmode
 
                     cursor.execute('INSERT INTO order_info_check (OSN,TS,SR,TEST_ID,BATCH_ID,STATUS,CHECK_RESULT) VALUES (?,?,?,?,?,?,?)',
                            (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid'],str_batchid,hawb_status,hawb_check))

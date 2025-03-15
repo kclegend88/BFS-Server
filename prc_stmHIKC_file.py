@@ -110,8 +110,8 @@ def start_process(config_file):
 
                 path = path + '\\' + day + '\\'
                 order_path = order_path + '\\' + day + '\\'
-                print(path)
-                print(order_path)
+                # print(path)
+                # print(order_path)
                 # 查找包含uid的图片
                 if os.path.exists(path):
                     # 获取文件及其最后修改时间，按修改时间排序
@@ -139,7 +139,7 @@ def start_process(config_file):
                             inst_logger.info(f"图片复制成功")
                             break  # 如果只需要找到一个图片就可以退出循环
                         else:
-                            inst_logger.info(f"当前图片不是，尝试下一张")
+                            inst_logger.debug(f"当前图片不是，尝试下一张")
                 else:
                     inst_logger.info(f"图片路径不存在")
         # 删除
