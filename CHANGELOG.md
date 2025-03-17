@@ -263,6 +263,49 @@ Update cli_qt, add list for mr,nr,NG
 Update cli_ms, add command __clean__ 
 Update client op, add save date function, save status into db
  
+# Rev 1.0a
+Currently Stable Version
+try main_cli.py quit when server quit, failed
+update main_cli_qt.ini , detail commence for screen related parameter
+update main_cli_qt.py, add hpk,barcode, op mode 
+	update ftp_download
+update prc_cli_manualscan.py, add __clean__ mode and fix bugs in this mode
+update fRedis, add sadds, pipeline, scan,keysfast, delete_keys methods
+update fVerificationDialog 
+update main.py quit all cli when server quit, failed
+update prc_barcodecheck.py, add out mode, not test yet
+fix bug in prc_HIKCamera.py, quit thread when receive quit command
+update prc_plc.py, add check result into stream
+update prc_stmManualscan.py, fix bugs 
+update prc_stmReadingConfirm_dss, prc_stmReadingConfirm, op_mode display and save, not test yet
+
+# Rev 1.0b
+Stable Version for shoping festival
+Add fTrace.py , single instance save barcode, uid, ts into sqlite database , to trace barcode whole lift cycle.
+Add fTraceEx.py, not single instance function, same function
+Add prc_PLC-BFS01/02.ini, for different BFS
+Update prc_stmHIKC_file.ini, prc_stmReadingConfirm_dss.ini, all IO thread might exit  because IO delay more than expiretime, change prc_expiretime to 999000, to avoid unexpect quit
+
+Update fHIKCamera.py, add fTrace instance to trace package lost.
+
+Update main.py change sys:cli to sys_cli, still not working.
+
+Update prc_HIKCamera.py fix heart luts calc bug, change interval from 5s to 10s
+
+Update prc_PLC.py, add HIKOut position, con length and calc stop time automatically
+	temporary keep abnormal parcel in cv03 and always display on cli screen
+	add try on plc.py, avoid exit abnormal 
+
+Update prc_stmReadingConfirm.py fix getskey bugs
+
+
+
+
+
+ 
+
+
+
 
  
 

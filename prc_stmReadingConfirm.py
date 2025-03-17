@@ -84,6 +84,11 @@ def start_process(config_file):
 
         # --------------------
         # 主线程操作区
+
+        # 获取当前操作模式
+        sys_opmode = inst_redis.getkey("sys:opmode")
+        if not sys_opmode == "OUT":
+            sys_opmode = "HPK"
         l = inst_redis.xreadgroup("stream_reading_confirm","ReadingConfirm","ReadingConfirm-DB01")
 
         if len(l)>0 :                       # 收到消息
@@ -100,6 +105,7 @@ def start_process(config_file):
                     if not hawb_check:
                         inst_logger.error("本单核查结果为空,单号 %s" %(dictdata['barcode'],))
                         hawb_check = "*OK*"
+                    # 如计数有误，需要将hawb_check强行赋值 sys_opmode
 
                     cursor.execute('INSERT INTO order_info_check (OSN,TS,SR,TEST_ID,BATCH_ID,STATUS,CHECK_RESULT) VALUES (?,?,?,?,?,?,?)',
                            (dictdata['barcode'],dictdata['ts'],dictdata['scan_result'],dictdata['uid'],str_batchid,hawb_status,hawb_check))
@@ -115,10 +121,15 @@ def start_process(config_file):
                     conn.commit()
 
                 try:
-                    cursor.execute('SELECT count(DISTINCT OSN) from order_info_check where BATCH_ID = ?',(str_batchid,))   # 后续需要加入运单编号去重
+                    cursor.execute('SELECT count(DISTINCT OSN) from order_info_check where BATCH_ID = ? and CHECK_RESULT = ?',(str_batchid,"HPK"))   # HPK计数
                     count_data = cursor.fetchall()
-                    inst_logger.debug("当前测试 %s 总计包裹 %s"%(str_batchid,count_data[0][0]))
-                    inst_redis.setkey("sys:hawb:count",f"{count_data[0][0]}")
+                    inst_logger.debug("当前测试 %s HPK 总计包裹 %s"%(str_batchid,count_data[0][0]))
+                    inst_redis.setkey("sys:hawb:hpk_count",f"{count_data[0][0]}")
+
+                    cursor.execute('SELECT count(DISTINCT OSN) from order_info_check where BATCH_ID = ? and CHECK_RESULT = ?',(str_batchid,"OUT"))   # OUT计数
+                    count_data = cursor.fetchall()
+                    inst_logger.debug("当前测试 %s OUT 总计包裹 %s"%(str_batchid,count_data[0][0]))
+                    inst_redis.setkey("sys:hawb:out_count",f"{count_data[0][0]}")
                 except:
                     inst_logger.debug("SQLite DB 读取计数失败"+traceback.format_exc())
 

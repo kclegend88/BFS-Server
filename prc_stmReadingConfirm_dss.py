@@ -32,7 +32,7 @@ def start_process(config_file):
 
     # --------------------    
     # 定制化配置参数读取区
-    ccr = __ini_prc_config__.Dss.ccr
+    # ccr = __ini_prc_config__.Dss.ccr
     dss_ip = __ini_prc_config__.Server.dss_ip
     dss_port = __ini_prc_config__.Server.dss_port
     severIp = f'http://{dss_ip}:{dss_port}/'
@@ -70,32 +70,44 @@ def start_process(config_file):
     while b_thread_running:
         # 刷新当前线程的运行锁
         inst_redis.setkeypx(f"pro_mon:{__prc_name__}:run_lock", __prc_id__, __prc_expiretime)
+
+        #获取系统当前操作模式
+        sys_opmode = inst_redis.getkey("sys:opmode")
+        if not sys_opmode == "OUT":
+            sys_opmode ="HPK"
         # --------------------
         # 以下为主线程操作区
         # 获取redis中readingconfirm数据，如果获取到数据，改变格式json格式，则提交到dss服务器上
         stream_readingConfirm_dss = inst_redis.xreadgroup(stream_name_dss, group_name, "consumer1")
         if stream_readingConfirm_dss:
-            inst_logger.info("收到序列 %s 中的消息累计 %d 行" % (stream_readingConfirm_dss[0][0], len(stream_readingConfirm_dss[0][1])))
+            inst_logger.debug("收到序列 %s 中的消息累计 %d 行" % (stream_readingConfirm_dss[0][0], len(stream_readingConfirm_dss[0][1])))
             for i, dictdata in stream_readingConfirm_dss[0][1]:
                 uid = dictdata['uid']
                 barcode = dictdata['barcode']
                 scan_result = dictdata['scan_result']
-                inst_logger.info(f"获取到UID:{uid},barcode:{barcode},scan_result:{scan_result}")
-                result_menu = [{"hawb": barcode, "ccr": ccr}]
+                check_result = dictdata['check_result']
+                inst_logger.debug(f"获取到UID:{uid},barcode:{barcode},scan_result:{scan_result},check_result:{check_result}")
+
+                # 如果不符合状态 则仅记录日志，不推送结果
+                if check_result != sys_opmode :
+                    inst_logger.error(
+                        f"barcode:{barcode}包括与当前操作模式 {sys_opmode} 不符,check_result:{check_result}")
+                    continue
+                result_menu = [{"hawb": barcode, "ccr": sys_opmode}]
                 # 发送POST请求	/FastScan/submit_CCR
                 try:
                     address = severIp + 'FastScan/submit_CCR'
                     response = requests.post(address, json=result_menu, headers=headers)
                     status = response.json()
-                    inst_logger.info(f"请求数据为：{result_menu}")
-                    inst_logger.info(f"返回数据为：{status}")
+                    inst_logger.debug(f"请求数据为：{result_menu}")
+                    inst_logger.debug(f"返回数据为：{status}")
                     code = status['code']
                     if code == 200:
-                        inst_logger.info(f"提交成功，代码:200,返回信息为：{status['message']}")
+                        inst_logger.debug(f"提交成功，代码:200,返回信息为：{status['message']}")
                     elif code == 400:
-                        inst_logger.info(f"提交失败，代码:400,返回信息为：{status['message']}")
+                        inst_logger.error(f"提交失败，代码:400,返回信息为：{status['message']}")
                     elif code == 500:
-                        inst_logger.info(f"提交失败，代码:500,返回信息为：{status['message']}")
+                        inst_logger.error(f"提交失败，代码:500,返回信息为：{status['message']}")
                 except Exception as e:
                     inst_logger.error(traceback.format_exc())
         # 以上为主线程操作区       

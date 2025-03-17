@@ -114,14 +114,20 @@ class main:
 
         time.sleep(3)
         
-        self.inst_redis.setkey("sys:batchid","0130T01B2")
+        self.inst_redis.setkey("sys:batchid","##")      # 初始化MAWB
         while True:
             strInput = input("Type 'Y' and press enter if you want to exit...: ")
             if strInput == 'Y':
                 break
-            
-        self.inst_redis.setkey(f"pro_mon:monitor:command", "exit")
-        
+        self.inst_redis.setkey(f"pro_mon:monitor:command", "exit")  # 通知主线程monitor 关闭所有线程
+
+        # 查找所有cli，通知所有已经启动的main_cli，自行退出
+        cli_list = self.inst_redis.keys("sys_cli")
+        for i,str_cli in enumerate(cli_list):
+            if str_cli.endswith(":ready"):
+                self.inst_redis.clearkey(str_cli)   # 删除所有sys_cli下面 以:ready结尾的键
+                self.inst_logger.info("主程序清理客户端键值 %d " % (str_cli,))
+
         # 将主程序堵塞至所有线程全部完成
         for i,th in enumerate(lst_thread):
             th.join()

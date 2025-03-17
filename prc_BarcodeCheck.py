@@ -108,7 +108,7 @@ def start_process(config_file):
             if len(parts) == 3 and parts[0] == 'parcel' and parts[1] == 'barcode':      # key是完整的键名
                 barcode = inst_redis.getkey(key)                                        # 获取条码
                 check_result = inst_redis.getkey(f"parcel:check_result:{uid}")     # 获取条码检查结果
-                if barcode == "NoBarcode":
+                if barcode == "NoBarcode" or barcode is None:
                     continue
                 if check_result != "##":
                     continue
@@ -158,7 +158,7 @@ def start_process(config_file):
                     inst_redis.sadd("set_check_ok", barcode)
                     continue
 
-                if  500 <= hawb_status< 700:  # 重复扫描
+                if  500 <= hawb_status< 600:  # 重复扫描
                     check_result = "RC"
                     inst_redis.setkey(f"parcel:check_result:{uid}", check_result)
                     inst_redis.setkey(f"hawb:status:{barcode}", f"{hawb_status+1}")  # 记录重复次数
@@ -166,6 +166,16 @@ def start_process(config_file):
                     # inst_redis.sadd("set_check_ng")
                     inst_redis.sadd("set_check_ok",barcode)     # 后续在此处加入ini文件判断，rc是否判ng
                     continue
+
+                if  600 <= hawb_status< 700:  # 重复扫描
+                    check_result = "OUT"
+                    inst_redis.setkey(f"parcel:check_result:{uid}", check_result)
+                    inst_redis.setkey(f"hawb:status:{barcode}", '700')  # 暂时写500
+                    inst_logger.info("条码 %s HPK状态正常，核查结果为: %s" % (barcode, check_result))
+                    # inst_redis.sadd("set_check_ng")
+                    inst_redis.sadd("set_check_ok",barcode)     # 后续在此处加入ini文件判断，rc是否判ng
+                    continue
+
                 if 700 <= hawb_status < 800:  # OUT件扫描，SF
                     # 后续需要在此加入sys:mode和sys:opmode的判断
                     # 如果mode为z且opmode为hpk，已OUT件扫描HPK，报系统错误，应停线！！

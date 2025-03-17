@@ -107,11 +107,11 @@ def start_process(config_file,__cli_id__):
         inst_redis.lstException.clear()
         # 取得QT窗口拦截的键盘输入，即扫描枪扫描数据
         strManualScanBarcode = inst_redis.getkey(f"manualscan:cli{__cli_id__:02}_qt:input")
-        #strManualScanBarcode = inst_redis.getkey(f"manualscan:cli00_qt:input")
         lst_reading_nr = list(inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
         set_reading_mr = inst_redis.getset("set_reading_mr")  # 更新set_reading_mr
         sys_status = inst_redis.getkey("sys:status")    #更新系统状态
         set_check_ng = inst_redis.getset("set_check_ng")    # 更新set_check_ng
+
         if strManualScanBarcode == "__clean__":  # 特定的清场命令
             inst_logger.info("收到__clean__命令，向服务器发送离开清场模式的指令")
             inst_redis.setkey(f"manualscan:cli{__cli_id__:02}_qt:input", "")  # 清空缓冲区
@@ -211,19 +211,19 @@ def start_process(config_file,__cli_id__):
                 mixer.music.load(dict_sound['ms_barcode_rescan_accept'])
                 mixer.music.play()
                 # 创建并使用对话框
-                dialog = VerificationDialog()
-                result = dialog.exec_()
-
-                if result == QDialog.Accepted:
-                    # 成功捕获NG包裹，且扫描了正确的框号
-                    inst_redis.sadd("set_check_ng_catch", strManualScanBarcode)  # set_check_ng_catch
-                    inst_logger.info(
-                        "NG包裹捕获成功,线程 %s 将NG包裹 %s 加入set_check_ng_catch中" % (__prc_name__, strManualScanBarcode))
-                    continue
-                else:
-                    inst_logger.info(
-                        "NG包裹扫描成功，捕获失败,线程 %s 未能将NG包裹 %s 加入set_check_ng_catch中" % (__prc_name__, strManualScanBarcode))
-                    continue
+                # dialog = VerificationDialog()
+                # result = dialog.exec_()
+                #
+                # if result == QDialog.Accepted:
+                #     # 成功捕获NG包裹，且扫描了正确的框号
+                #     inst_redis.sadd("set_check_ng_catch", strManualScanBarcode)  # set_check_ng_catch
+                #     inst_logger.info(
+                #         "NG包裹捕获成功,线程 %s 将NG包裹 %s 加入set_check_ng_catch中" % (__prc_name__, strManualScanBarcode))
+                #     continue
+                # else:
+                #     inst_logger.info(
+                #         "NG包裹扫描成功，捕获失败,线程 %s 未能将NG包裹 %s 加入set_check_ng_catch中" % (__prc_name__, strManualScanBarcode))
+                #     continue
 
             # 条码格式校验
             bBarcodeValid = False

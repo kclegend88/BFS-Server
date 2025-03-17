@@ -49,3 +49,12 @@
 - [x] plc_conv, data_type replan, no need: is lock, avoid continue start-stop
 
 - [ ] All stream change to read-ack loop, check pending when restart;
+
+
+LOG Level: 
+    DEBUG.      commissioning,
+    INFO.       barcode/uid 
+    WARNING.    
+    ERROR.      exception
+    CRITICAL.
+    

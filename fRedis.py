@@ -204,7 +204,6 @@ class clsRedis:
                 return result
         else:
             raise Exception("Redis尚未建立连接")
-    
 
     def lpush(self, name, value):
         # 向列表左侧增加值
@@ -403,3 +402,83 @@ class clsRedis:
             return value
         else:
             raise Exception("Redis尚未建立连接")
+
+    # -------------------dj新增-------------------
+    def sadds(self, name, *value):
+        # 向set增加值
+        # TODO 返回是否有元素重复
+        if self.__isconnected__:
+            self.decoded_connection.sadd(name, *value)
+            return
+        else:
+            raise Exception("Redis尚未建立连接")
+
+    def pipeline(self):
+        """创建并返回Redis管道对象"""
+        if not self.__isconnected__:
+            raise ConnectionError("Redis未连接，请先调用connect方法")
+        with self.redis_lock:  # 确保线程安全
+            return self.decoded_connection.pipeline()
+
+    def mget(self, keys):
+        """ 批量获取键值 """
+        if not self.__isconnected__:
+            raise ConnectionError("Redis未连接")
+        return self.decoded_connection.mget(keys)  # 直接调用redis-py的mget
+
+    def keys_fast(self, pattern):
+        """ 使用SCAN安全获取键（避免阻塞） """
+        if not self.__isconnected__:
+            raise ConnectionError("Redis未连接")
+        # 使用SCAN代替KEYS命令
+        all_keys = []
+        cursor = '0'
+        while cursor != 0:
+            cursor, partial_keys = self.decoded_connection.scan(
+                cursor=cursor,
+                match=pattern,
+                count=1000  # 每次扫描1000个键
+            )
+            all_keys.extend(partial_keys)
+        return all_keys
+
+    def scan(self, match_pattern, count=100):
+        """
+        实现 Redis 的 SCAN 功能
+        :param match_pattern: 匹配模式，例如 "hawb:epc:*"
+        :param count: 每次迭代返回的键数量
+        :return: 匹配的键列表
+        """
+        try:
+            cursor = '0'
+            keys = []
+            while cursor != 0:
+                # 使用 SCAN 命令
+                cursor, partial_keys = self.decoded_connection.scan(
+                    cursor=cursor,
+                    match=match_pattern,
+                    count=count
+                )
+                keys.extend(partial_keys)
+            return keys
+        except Exception as e:
+            # 记录异常
+            self.append_exception('scan', str(e))
+            raise
+
+    def delete_keys(self, match_pattern):
+        """
+        批量删除匹配的键
+        :param match_pattern: 匹配模式，例如 "hawb:epc:*"
+        :return: 删除的键数量
+        """
+        try:
+            keys = self.scan(match_pattern)
+            if keys:
+                # 使用 UNLINK 异步删除
+                return self.decoded_connection.unlink(*keys)
+            return 0
+        except Exception as e:
+            # 记录异常
+            self.append_exception('delete_keys', str(e))
+            raise

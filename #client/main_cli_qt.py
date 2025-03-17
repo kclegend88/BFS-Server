@@ -1,4 +1,5 @@
 # prc_template  v 0.2.0
+import shutil
 import sys
 from symbol import pass_stmt
 from time import sleep
@@ -27,7 +28,7 @@ from fConfig import clsConfig
 from fConfigEx import clsConfigEx
 from fRedis import clsRedis
 from pygame import mixer
-
+from fVerificationDialog import VerificationDialog
 
 class BarcodeDisplay(QWidget):
     def __init__(self, inst_redis, __cli_id__, inst_logger, __prc_name__, __ini_prc_config__):
@@ -327,7 +328,27 @@ class BarcodeDisplay(QWidget):
         str_bc_input = str(self.barcode_input)              # 获取str格式的输入信息
         self.barcode_input = ""                             # 清空按键输入缓存
         self.inst_logger.info(f"QT收到的完整输入信息:{str_bc_input}")
-
+        #######
+        
+        set_check_ng = self.inst_redis.getset("set_check_ng")
+        if str_bc_input in set_check_ng:
+            dialog = VerificationDialog()
+            result = dialog.exec_()
+            if result == 1:
+            # 成功捕获NG包裹，且扫描了正确的框号
+                self.inst_redis.sadd("set_check_ng_catch", str_bc_input)  # set_check_ng_catch
+                self.inst_logger.info(
+                    "NG包裹捕获成功,线程 %s 将NG包裹 %s 加入set_check_ng_catch中" % (self.__prc_name__, str_bc_input))
+                #self.update_barcode(f"catch_{str_bc_input}")   # update redis，传递补码信息给ms线程
+                self.update_barcode(str_bc_input)   # update redis，传递补码信息给ms线程
+                #self.scanbarcode = str_bc_input     # 传递条码信息给定时更新程序 update_table
+                self.show_status(f"✅ 捕获NG条码，{str_bc_input}", "#FFB6C1")
+                return      #确认捕获之后，不需要再将结果发送给服务器，否则会第二次触发警报；
+            else:
+                self.inst_logger.info(
+                    "NG包裹扫描成功，捕获失败,线程 %s 未能将NG包裹 %s 加入set_check_ng_catch中" % (self.__prc_name__, str_bc_input))
+        ########
+        
         # 判断收到的是条码还是命令，如果不是以*开头，*结尾的，不是命令
         str_command_input = ""
         if str_bc_input.startswith("*") and str_bc_input.endswith("*"):
@@ -510,7 +531,7 @@ class BarcodeDisplay(QWidget):
         self.tableWidget = QtWidgets.QTableWidget()
         self.tableWidget.setFont(font)
         self.tableWidget.setAutoScrollMargin(16)
-        self.tableWidget.setRowCount(10)
+        self.tableWidget.setRowCount(20)
         self.tableWidget.setObjectName("tableWidget")
         self.tableWidget.setColumnCount(5)
         self.tableWidget.setHorizontalHeaderLabels(["条码", "X值", "Y值", "scan","check"])
@@ -601,6 +622,15 @@ class BarcodeDisplay(QWidget):
                 self.close()
                 int_exit_code = 2
                 return
+            # 根据redis中的操作模式 设置cli_qt上的显示信息
+            opmode = self.inst_redis.getkey("sys:opmode")
+            if opmode == "OUT":
+                # self.out.setBackground(QBrush(QColor(255, 105, 180)))
+                pass
+            else:
+                # self.hpk.setBackground(QBrush(QColor(255, 105, 180)))
+                pass
+
             # 获取redis中plc是否停线，如果plc停线，进入异常处理操作
             self.control_update()
 
@@ -780,6 +810,7 @@ class BarcodeDisplay(QWidget):
                 stream_test = self.inst_redis.xreadgroup(self.stream_name_create, self.__prc_name__, "consumer1")
                 stream_reading_confirm = self.inst_redis.xreadgroup(self.stream_name_delete, self.__prc_name__,
                                                                     "consumer1")
+                time.sleep(0.1) # 每次检查stream 间隔0.1秒
                 try:
                     if stream_test:
                         self.inst_logger.info(
@@ -848,7 +879,7 @@ class BarcodeDisplay(QWidget):
                             for ant in range(len(self.image_list)):
                                 self.addImageToFrame(f"frame_{ant}", self.image_list[ant][3], self.image_list[ant][1])
                 except Exception as e:
-                    self.inst_logger.error(f"图片获取失败,ftp ={self.server_ip},,ftp_path={ftp_path}")
+                    self.inst_logger.error(f"pic_show:图片获取失败,ftp ={self.server_ip},,ftp_path={ftp_path}")
                     self.inst_logger.error(f"{traceback.format_exc()}")
                 try:
                     if stream_reading_confirm:
@@ -865,10 +896,10 @@ class BarcodeDisplay(QWidget):
                             else:
                                 self.inst_logger.error(f"{uid}不在队列中，无法删除")
                 except Exception as e:
-                    self.inst_logger.error("stream_reading_confirm删除队列失败")
+                    self.inst_logger.error("pic_show: stream_reading_confirm删除队列失败")
                     self.inst_logger.error(f"{traceback.format_exc()}")
             except Exception as e:
-                self.inst_logger.error("出现错误")
+                self.inst_logger.error("pic_show 在ftp下载时出现异常 出现错误")
                 time.sleep(5)
                 self.inst_logger.error(f"{traceback.format_exc()}")
 
@@ -990,9 +1021,10 @@ class BarcodeDisplay(QWidget):
         self.total_number.setText(f"{len(set_hawb)}")
         str_batchid = self.inst_redis.getkey("sys:batchid")     # 主单编号
         self.mawbid.setText(str_batchid)
-        str_batchid_count = self.inst_redis.getkey("sys:hawb:count")    # 本地数据库中存储的 已有结果的运单数量
-        self.hpk_number.setText(str_batchid_count)
-        self.out_number.setText("0")
+        str_hpk_count = self.inst_redis.getkey("sys:hawb:hpk_count")    # 本地数据库中存储的 已有结果的运单数量
+        str_out_count = self.inst_redis.getkey("sys:hawb:out_count")    # 本地数据库中存储的 已有结果的运单数量
+        self.hpk_number.setText(str_hpk_count)
+        self.out_number.setText(str_out_count)
 
         self.NR.setText(f"NR:{len(lst_nr)}/{len(set_reading_nr)}")        # 已成功补码的NR/总NG
         self.MR.setText(f"MR:{len(set_mr)}/{len(set_reading_mr)}")        # 已成功补码的MR/总MR

@@ -10,7 +10,7 @@ from fConfigEx import clsConfigEx
 from fRedis import clsRedis
 from fHIKCamera import clsHIKCameraClient
 
-
+from fTrace import clsTrace
 
 def start_process(config_file):
     def prc_stmMS_dataproc(lstdata):
@@ -61,7 +61,6 @@ def start_process(config_file):
             inst_logger.error("线程 %s 中, 离开清场模式并清理所有数据" % (__prc_name__,))
 
         # 将read_nr/mr中的所有包裹，从set_reading mr/nr中删除，移动到set_reading_gr中，parcel:status更改成为mr_ms或者nr_ms
-
         for i,parcel_uid in enumerate(lst_reading_nr):
             inst_redis.setkey(f"parcel:scan_result:{parcel_uid}","NR_MS")
             inst_redis.setkey(f"parcel:barcode:{parcel_uid}",lst_ms_nr[i])
@@ -70,6 +69,7 @@ def start_process(config_file):
             inst_redis.setkey(f"parcel:check_result:{parcel_uid}", '##')  # uid对应的包裹，核查结果 ##
             inst_redis.setkey(f"parcel:ms_barcode:{lst_ms_nr[i]}",parcel_uid)  # 参照多条码读取出来的条码，对应的uid ，check ng时需要
 
+            inst_trace.trace(parcel_uid, __prc_name__, f"MR_MS:{lst_ms_nr[i]}")
         inst_redis.clearset("set_ms_nr")
         inst_redis.clearset("set_reading_nr")
         # stm_ms 清理
@@ -80,12 +80,13 @@ def start_process(config_file):
             inst_redis.setkey(f"parcel:barcode:{parcel_uid}",parcel_barcode)
             inst_redis.sadd("set_reading_gr", parcel_barcode)  # 将条码加入set_reading_gr
             inst_logger.info("包裹补码成功,线程 %s 修改MR包裹状态 uid= %s, barcode =%s"%(__prc_name__,parcel_uid,parcel_barcode))
-        inst_redis.clearset("set_ms_mr")       
+            inst_trace.trace(parcel_uid, __prc_name__, f"MR_MS:{parcel_barcode}")
+        inst_redis.clearset("set_ms_mr")
         inst_redis.clearset("set_reading_mr")
 
         # 将check_ng中的所有包裹，从set_check_ng中删除，移动到set_check_ng_catch中
         # parcel:check_result更改成为ng_catch
-        for parcel_barcode in enumerate(set_check_ng):
+        for parcel_barcode in set_check_ng:
             parcel_uid = inst_redis.getkey(f"parcel:ms_barcode:{parcel_barcode}")
             inst_redis.setkey(f"parcel:check_result:{parcel_uid}", "NG_CT")
             inst_redis.sadd("set_check_ng_catch", parcel_barcode)  # set_check_ng_catch
@@ -115,6 +116,7 @@ def start_process(config_file):
     ini_config = clsConfig(config_file)     # 来自主线程的配置文件
     inst_logger = clsLogger(ini_config)     # 实际上与主线程使用的是同一实例
     inst_redis = clsRedis(ini_config)       # 实际上与主线程使用的是同一实例
+    inst_trace = clsTrace("Trace.db")
 
     inst_logger.info("线程 %s 正在启动" %(__prc_name__,))
 
