@@ -170,6 +170,7 @@ def start_process(config_file):
             # 如果bRecvValidData为True，说明收到校验成功的数据
             if cli.bRecvValidData:
                 prc_HC_recvData()
+                heart_luts = datetime.datetime.now()
             # 检查是否有未记录的异常信息，如有的话，记录异常信息
             if cli.lstException:
                 for i, e in enumerate(cli.lstException):

@@ -206,7 +206,7 @@ class clsRedis:
     def xcreategroup(self, sname, gname):
         # 为每个线程创建一个组
         if self.__isconnected__:
-            self.decoded_connection.xgroup_create (sname,gname, id=0)
+            self.decoded_connection.xgroup_create (sname,gname, id='$')
             return 
         else:
             raise Exception("Redis尚未建立连接")         

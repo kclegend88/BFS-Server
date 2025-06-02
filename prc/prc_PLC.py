@@ -43,7 +43,7 @@ def start_process(config_file):
             inst_redis.setkey("plc_conv:light:status", "off")
             # status = int(status)
             __inst_plc__.db_write(12, 23, bytearray([0]))
-    def prc_PLC_startconv():        # 启动输送机，只要command收到start 即执行
+    def prc_PLC_startconv(alarm_flag):        # 启动输送机，只要command收到start 即执行
         nonlocal __inst_plc__,inst_redis
         plc_conv_status = inst_redis.getkey("plc_conv:status")
         plc_conv_fullspeed = inst_redis.getkey("plc_conv:fullspeed")
@@ -51,6 +51,8 @@ def start_process(config_file):
             inst_logger.error("线程 %s 高速时收到启动信号" % (__prc_name__,))
             inst_redis.clearkey('plc_conv:command') # 报错后删除command,避免重复执行 
             return
+        if alarm_flag:
+            __inst_plc__.db_write(12, 17, bytearray([1]))
         for i in range(1, 5):
             __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([3]))
         inst_redis.setkey(f"plc_conv:status", "run")
@@ -60,7 +62,7 @@ def start_process(config_file):
         inst_logger.info("线程 %s 皮带机启动，当前速度为高速" % (__prc_name__,))
         inst_redis.clearkey('plc_conv:command')             # 执行后删除command,确保执行一次
 
-    def prc_PLC_stopconv():         # 停止输送机，只要command收到stop 即执行
+    def prc_PLC_stopconv(alarm_flag):         # 停止输送机，只要command收到stop 即执行
         nonlocal __inst_plc__,inst_redis
         plc_conv_status = inst_redis.getkey("plc_conv:status")
         if plc_conv_status == 'pause':  # 已停止，记录逻辑错误
@@ -69,6 +71,8 @@ def start_process(config_file):
             return       
         for i in range(1, 5):
             __inst_plc__.db_write(12, 3 + (i - 1) * 4, bytearray([0]))
+        if alarm_flag:
+            __inst_plc__.db_write(12, 19, bytearray([1]))
         inst_redis.setkey("plc_conv:status", "pause")
         inst_redis.clearkey('plc_conv:fullspeed')
         for i in range(1, 5):
@@ -207,7 +211,12 @@ def start_process(config_file):
                 # 一直没有补码成功的就会留在redis里面，提醒注意
                 inst_redis.setkey(f"{key}",__ini_conv_length-500)
                 inst_logger.error(f"异常包裹流出CV03！！ ,uid={str_uid},barcode={str_barcode},result={str_result}")
-
+                inst_redis.clearkey(f"{key}")                           # parcel:posx
+                inst_redis.clearkey(f"parcel:posy:{str_uid}")           # parcel:posy
+                inst_redis.clearkey(f"parcel:sid:{str_uid}")            # parcel:sid
+                inst_redis.clearkey(f"parcel:scan_result:{str_uid}")    # parcel:scan_result
+                # inst_redis.clearkey(f"parcel:check_result:{str_uid}")   # parcel:check_result
+                inst_redis.clearkey(f"parcel:barcode:{str_uid}")        # parcel:barcode
                 continue
                 # 发送停线指令
                 # prc_PLC_autostop()
@@ -394,7 +403,7 @@ def start_process(config_file):
             if prc_run_lock is None:
                 # --------------------
                 # 以下为定制区域，用于中止线程内创建的线程或调用的函数
-                prc_PLC_stopconv()
+                prc_PLC_stopconv(True)
                 PLC_light("off")
                 time.sleep(3)
                 # 以上为定制区域，用于中止线程内创建的线程或调用的函数
@@ -407,7 +416,7 @@ def start_process(config_file):
             if prc_run_lock == "exit":
                 # 在此处判断是否有尚未完成的任务，或尚未处理的stm序列；
                 # 如有则暂缓退出，如没有立即退出
-                prc_PLC_stopconv()
+                prc_PLC_stopconv(True)
                 PLC_light("off")
                 time.sleep(3)
                 int_exit_code = 2
@@ -426,12 +435,12 @@ def start_process(config_file):
 
             # 输送机强制启动，命令来自于外部客户端或main启动时的指令
             if plc_conv_command == "start":
-                prc_PLC_startconv()
+                prc_PLC_startconv(True)
                 continue
 
             # 输送机强制停止，命令来自于外部客户端或main退出时的指令
             if plc_conv_command == "stop":
-                prc_PLC_stopconv()
+                prc_PLC_stopconv(True)
                 continue
 
             # 输送机强制停止，命令来自于外部客户端或main退出时的指令
@@ -472,7 +481,7 @@ def start_process(config_file):
                     continue
                 inst_redis.setkey("sys:status", "normal")
                 inst_logger.info("成功退出清场模式，线程 %s 尝试重新启动输送机" % (__prc_name__,))
-                prc_PLC_startconv()
+                prc_PLC_startconv(False)
         except Exception as e:
             # self.inst_logger(f"{keys}")
             inst_logger.error("PLC线程出现致命错误:"+traceback.format_exc())

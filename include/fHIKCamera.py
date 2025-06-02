@@ -74,7 +74,7 @@ class clsHIKCameraClient:
         while True:
             try:
                 self.bRECVThread = True
-                data = self.conn.recv(2048) # 堵塞至收到数据为止
+                data = self.conn.recv(2048)  # 堵塞至收到数据为止
                 if not data:                    # 返回 空 表示对方已关闭连接
                     self.bDISCONNECT = True     # 设置断连标志
                     self.bRECVThread = False    # 标记监听线程已终止

@@ -132,11 +132,16 @@ class main:
     def stop_main(self, op):
         op.inst_redis.setkey("pro_mon:monitor:command", "exit")
         # 查找所有cli，通知所有已经启动的main_cli，自行退出
-        cli_list = op.inst_redis.keys("sys_cli")
-        for i, str_cli in enumerate(cli_list):
-            if str_cli.endswith(":ready"):
-                op.inst_redis.clearkey(str_cli)  # 删除所有sys_cli下面 以:ready结尾的键
-                op.inst_logger.info("主程序清理服务端键值 %d " % (str_cli,))
+        # 从 sys_cli00 开始逐个检测，最多查10个
+        for i in range(10):
+            base_key = f"sys_cli{i:02d}:ready"
+            print(op.inst_redis.exists(base_key))
+            if not op.inst_redis.exists(base_key):
+                break
+            print(1)
+            ready_key = f"{base_key}"
+            op.inst_redis.setkey(ready_key, "")  # 假设 setkey 方法支持写入空值
+            op.inst_logger.info(f"主程序清理服务端键值 {ready_key}")
 
         # 将主程序堵塞至所有线程全部完成
         for i, th in enumerate(op.lst_thread):
@@ -187,7 +192,7 @@ class MainApp(tk.Tk):
         self.start_btn = ttk.Button(btn_frame, text="Start", command=self.start_process)
         self.start_btn.pack(side=tk.LEFT, padx=5)
 
-        self.stop_btn = ttk.Button(btn_frame, text="Stop", command=self.stop_process)
+        self.stop_btn = ttk.Button(btn_frame, text="Stop", command=self.on_close_stop)
         self.stop_btn.pack(side=tk.LEFT, padx=5)
         
         self.init_open()
@@ -313,12 +318,26 @@ class MainApp(tk.Tk):
         messagebox.showerror("Error", message)
         
     def on_close(self):
-        """处理窗口关闭事件"""
+        """处理窗口关闭事件 结束所有任务"""
         if messagebox.askokcancel("Exit", "Are you sure you want to exit the program?"):
             # 禁用按钮防止重复操作
             self.start_btn['state'] = tk.DISABLED
             self.stop_btn['state'] = tk.DISABLED
             self.status_label.config(text="Stopping threads, please wait...")
+                        
+            # 启动后台线程执行停止操作
+            threading.Thread(target=self.async_stop_and_exit, daemon=True).start()
+            
+            
+    def on_close_stop(self):
+        """处理窗口关闭事件  正常关闭"""
+        if messagebox.askokcancel("Exit", "Are you sure you want to exit the program?"):
+            # 禁用按钮防止重复操作
+            self.start_btn['state'] = tk.DISABLED
+            self.stop_btn['state'] = tk.DISABLED
+            self.status_label.config(text="Stopping threads, please wait...")
+            
+            main().stop_main(self.app)
             
             # 启动后台线程执行停止操作
             threading.Thread(target=self.async_stop_and_exit, daemon=True).start()

@@ -344,7 +344,7 @@ class clsRedis:
     def xcreategroup(self, sname, gname):
         # 为每个线程创建一个组
         if self.__isconnected__:
-            self.decoded_connection.xgroup_create (sname,gname, id=0, mkstream=True)
+            self.decoded_connection.xgroup_create (sname,gname, id='$', mkstream=True)
             return 
         else:
             raise Exception("Redis尚未建立连接")         
@@ -485,3 +485,14 @@ class clsRedis:
             # 记录异常
             self.append_exception('delete_keys', str(e))
             raise
+
+    def exists(self, key):
+        """检查键是否存在，返回布尔值 True/False"""
+        try:
+            if self.__isconnected__:
+                return self.decoded_connection.exists(key) >= 1
+            else:
+                # 键不存在时记录日志或执行其他操作
+                return None
+        except Exception as e:
+            raise Exception("Redis尚未建立连接")

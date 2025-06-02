@@ -20,12 +20,16 @@ def start_process(config_file):
             # 如果返回的是各类异常 BL/OP/NF/SF/RC,那么需要反馈barcode check 异常，要求客户端执行剔除操作
         
             # 如果返回的是ok，那么仅仅进行扫描补码，补码条件满足就恢复输送机运行
+            inst_logger.info(f"type的类型为{dictdata['type']}")
             if dictdata['type'] == 'MR':
                 inst_redis.sadd("set_ms_mr", dictdata['barcode'])     
             elif dictdata['type'] == 'NR':
                 inst_redis.sadd("set_ms_nr", dictdata['barcode'])
-            elif  dictdata['type'][0:2] == 'NG':
+            elif dictdata['type'][0:2] == 'NG':
                 inst_redis.sadd("set_check_ng_catch", dictdata['barcode'])
+            elif dictdata['type'] == 'NR_RJ':
+                inst_logger.info("发现补码为NRRJ")
+                inst_redis.sadd("set_nr_rj", dictdata['barcode'])
             elif dictdata['barcode'] == '__clean__':
                 inst_logger.error(
                     "线程 %s 中, prc_stmMS_dataproc 数据时收到客户端发来的离开清场模式的指令" % (__prc_name__,))
@@ -39,12 +43,35 @@ def start_process(config_file):
         set_ms_mr = inst_redis.getset("set_ms_mr")            # 更新set_ms_mr
         set_check_ng = inst_redis.getset("set_check_ng")  # set_check_ng
         set_check_ng_catch = inst_redis.getset("set_check_ng_catch")  # set_check_ng_catch
+        set_nr_rj = inst_redis.getset("set_nr_rj")
         
         # if len(lst_reading_nr) + len(set_reading_mr) == 0:
         if not bCleanMode:
-            if len(lst_reading_nr) + len(set_reading_mr)  + len(set_check_ng) == 0:
+            if len(lst_reading_nr) + len(set_reading_mr) + len(set_check_ng) == 0:
                 return
             # 开始逻辑判断
+            # 新增先判断是否有通缉件为无读
+            # 如果有，将noread变为通缉件进行处理 1.修改noread的parcel 2.将条码加入set_check_ng_catch和set_check_ng
+            if set_nr_rj:
+                inst_logger.error("线程 %s 中, prc_stmMS_dataproc 数据时发现set_nr_rj不为空" %(__prc_name__,))
+                # 获取一个uid
+                manualscan_barcode = inst_redis.getset("set_nr_rj").pop()
+                inst_redis.clearset("set_nr_rj")
+                uid = inst_redis.getset("set_reading_nr").pop()
+                inst_redis.setkey(f"parcel:scan_result:{uid}", "NG_RJ")
+                inst_redis.setkey(f"parcel:barcode:{uid}", manualscan_barcode)
+                inst_redis.clearkey(f"parcel:check_result:{uid}")  # 删除
+
+                inst_redis.clearsetvalue("set_reading_nr", uid)  # 删除nr里面的这个uid、
+
+                inst_redis.sadd("set_reading_ng", manualscan_barcode)  # 添加值ng里
+                # 将补码内容配齐
+                inst_redis.sadd("set_check_ng_catch", manualscan_barcode)
+                # 刷新ng内容
+                set_check_ng = inst_redis.getset("set_check_ng")  # set_check_ng
+                set_check_ng_catch = inst_redis.getset("set_check_ng_catch")  # set_check_ng_catch
+                lst_reading_nr = list(inst_redis.getset("set_reading_nr"))  # 更新set_reading_nr
+                lst_ms_nr = list(inst_redis.getset("set_ms_nr"))            # 更新set_ms_nr  
             # set_ms_nr 的数量，与set_reading_nr的数量一致
             if not len(lst_ms_nr)== len(lst_reading_nr):
                 return
@@ -193,13 +220,14 @@ def start_process(config_file):
         if prc_run_lock is None:  
             # --------------------
             # 以下为定制区域，用于中止线程内创建的线程或调用的函数
-            inst_redis.xdelgroup("stream_test", "HIKC_data")
+            inst_redis.xdelgroup("stream_manualscan", "manualscan")
             for i, e in enumerate(inst_redis.lstException):
                 inst_logger.error(
                     "线程 %s 超时退出时发生 Redis 异常，调用模块 %s，调用时间 %s，异常信息 %s "
                     % (__prc_name__,e['module'], e['timestamp'], e['msg']))
             inst_redis.lstException.clear()
-            inst_logger.info("线程 %s 删除stream组成功" %("HIKC_data",))
+            inst_logger.info("线程 %s 删除stream组成功" %("stream_manualscan",))
+
             # 以上为定制区域，用于中止线程内创建的线程或调用的函数           
             # --------------------
             int_exit_code = 1

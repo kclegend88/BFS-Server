@@ -297,7 +297,60 @@ Update prc_PLC.py, add HIKOut position, con length and calc stop time automatica
 	add try on plc.py, avoid exit abnormal 
 
 Update prc_stmReadingConfirm.py fix getskey bugs
+# BFS Server V1
 
+move all fxx.py into include folder
+move all prc_xxx.py into prc folder
+create BFS_Main.py
+intergrate all ini file into BFS_Main.ini
+
+update fRedis:
+	upgrade clearkey function, add force = True, to clear key not create by server;
+
+prc_barcodecheck：
+	del code for xdelgroup:HIKC_data,fix bug
+	add barcode check code into try-except, avoid quit
+
+prc_HIKCamera:
+	del heart_luts(need change back) &&&
+	modify command=exit method,need check later 
+
+prc_monitor_new
+	fix bug: when thread quit, lstThread keep del th from list and report fault.
+
+prc_stmHIKC_file
+	re write , thread download
+	add prc_stmHIKC_file2
+
+prc_stmReadingconfirm_dss
+	add dss_push
+
+# BFS Server V1.1
+BFS_main.py
+	temporary change sys_cli check method, delete sys_clixx:ready to inform client exit, 
+	need improve later,now only 10 can be handle;
+	
+	add on_close_stop, avoid multi press on "stop" button
+
+fRedis
+	add exists function, check sys_cli
+	xcreategroup start from now, not from beginning
+	
+prc_HIKCamera
+	heart_luts = datetime.datetime.now()
+	add back 
+
+prc_PLC
+	startconv,stopconv add alarm_flag, need clarify detail funtion in commence
+	
+prc_stmManualScan.py
+	add NG_RJ function ,when manual scan barcode in set_rj, add code for valid dailog.
+	correct wrong set detail bug for stream_test group HIKC
+
+
+
+	
+	
 
 
 
